@@ -35,6 +35,7 @@ public class PlayerMotor : MonoBehaviour
 
     [Header("Sliding")]
     [SerializeField] private float slideStartSpeed = 8f;
+    [SerializeField] private float slideToCrouchSpeed = 3f;
     [SerializeField] private float slideFriction = 5.5f;
     [SerializeField] private float slideSteering = 8f;
     [SerializeField] private float slideHeight = 1.1f;
@@ -55,7 +56,6 @@ public class PlayerMotor : MonoBehaviour
 
     private bool isSliding;
     private bool isCrouching;
-    private bool controlWasHeld;
 
     public bool IsSliding => isSliding;
     public bool IsCrouching => isCrouching;
@@ -120,14 +120,15 @@ public class PlayerMotor : MonoBehaviour
         {
             isSliding = false;
 
-            // Keep crouching if the player cannot fit standing up.
+            // Stay crouched if there isn't room to stand.
             isCrouching = currentHeight < originalHeight - 0.01f
                 && !CanStandUp();
         }
         else if (isSliding)
         {
-            // Continue sliding until Ctrl is released or we leave the ground.
-            if (!grounded)
+            // Transition from sliding to crouching when slow
+            // or when leaving the ground.
+            if (!grounded || actualSpeed <= slideToCrouchSpeed)
             {
                 isSliding = false;
                 isCrouching = true;
@@ -135,18 +136,16 @@ public class PlayerMotor : MonoBehaviour
         }
         else if (grounded && actualSpeed >= slideStartSpeed)
         {
-            // Moving fast enough while holding Ctrl starts a slide.
+            // Start sliding when moving fast enough.
             isSliding = true;
             isCrouching = false;
         }
         else
         {
-            // At lower speeds, Ctrl crouches.
+            // Holding Ctrl at a lower speed means crouching.
             isSliding = false;
             isCrouching = true;
         }
-
-        controlWasHeld = controlHeld;
     }
 
     private void ApplyMovement(bool grounded)
@@ -266,7 +265,7 @@ public class PlayerMotor : MonoBehaviour
                 ? crouchHeight
                 : originalHeight;
 
-        // Never increase the collider height unless there is room.
+        // Only stand up when there is enough room.
         if (targetHeight > currentHeight && !CanStandUp())
         {
             targetHeight = currentHeight;
@@ -290,7 +289,6 @@ public class PlayerMotor : MonoBehaviour
     {
         float radius = controller.radius * 0.95f;
 
-        // Calculate the full standing capsule in world space.
         Vector3 worldCenter =
             transform.TransformPoint(originalCenter);
 
@@ -374,7 +372,6 @@ public class PlayerMotor : MonoBehaviour
     {
         isSliding = false;
         isCrouching = false;
-        controlWasHeld = false;
         horizontalVelocity = Vector3.zero;
         verticalVelocity = Vector3.zero;
 

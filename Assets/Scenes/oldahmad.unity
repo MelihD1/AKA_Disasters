@@ -119,6 +119,67 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1001 &169495420
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 3.516303
+      objectReference: {fileID: 0}
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.00000044213346
+      objectReference: {fileID: 0}
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 6.372286
+      objectReference: {fileID: 0}
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2686781379290583028, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3315368137898038606, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: m_Name
+      value: door-rotate-square-b
+      objectReference: {fileID: 0}
+    - target: {fileID: 4587865961087733553, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
+      propertyPath: doorPanelCollider
+      value: 
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0683cae505e6e484aba5d6f3d51fb2fb, type: 3}
 --- !u!1 &314342837
 GameObject:
   m_ObjectHideFlags: 0
@@ -302,7 +363,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
       propertyPath: slideCameraDrop
-      value: 0.75
+      value: 0.85
+      objectReference: {fileID: 0}
+    - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+      propertyPath: crouchCameraDrop
+      value: 0.7
       objectReference: {fileID: 0}
     - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
       propertyPath: normalDeceleration
@@ -2847,13 +2912,14 @@ MonoBehaviour:
   jumpHeight: 1.2
   crouchSpeed: 3
   crouchHeight: 1.2
-  crouchCameraDrop: 0.35
+  crouchCameraDrop: 0.7
   crouchTransitionSpeed: 10
   slideStartSpeed: 8
+  slideToCrouchSpeed: 3
   slideFriction: 3.5
   slideSteering: 8
   slideHeight: 1.1
-  slideCameraDrop: 0.75
+  slideCameraDrop: 0.85
   heightChangeSpeed: 8
   slideCameraTransitionSpeed: 10
 --- !u!114 &910087573
@@ -5649,7 +5715,7 @@ MonoBehaviour:
   movementScriptsToDisable:
   - {fileID: 910087573}
   - {fileID: 996691131}
-  delayBeforeEarthquake: 4
+  delayBeforeEarthquake: 100
   earthquakeDuration: 5
   extraSurvivalTime: 4
   pauseBetweenEarthquakes: 3
@@ -5684,3 +5750,4 @@ SceneRoots:
   - {fileID: 336789475}
   - {fileID: 2009618570}
   - {fileID: 1735920737}
+  - {fileID: 169495420}
