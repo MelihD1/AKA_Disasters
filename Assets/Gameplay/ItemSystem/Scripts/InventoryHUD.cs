@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class InventoryHUD
+public class InvnetoryHud : MonoBehaviour
 {
-    
+
 }

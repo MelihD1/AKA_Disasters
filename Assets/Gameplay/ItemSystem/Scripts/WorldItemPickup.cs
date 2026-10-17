@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class WorldItemPickup
+public class WorldItemPickup : MonoBehaviour
 {
     
 }
