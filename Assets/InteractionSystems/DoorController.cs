@@ -1,3 +1,4 @@
+
 using System.Collections;
 using UnityEngine;
 
@@ -8,17 +9,23 @@ public class DoorController : MonoBehaviour, IInteractable
     [SerializeField] private Transform hingeTransform;
 
     [Header("Door Settings")]
-    [Tooltip("Angle relative to closed state (e.g. 90 degrees).")]
+    [Tooltip("Angle relative to closed state.")]
     [SerializeField] private float openAngle = 90f;
-    [Tooltip("Base duration (in seconds) to fully swing open at normal walk speed.")]
+
+    [Tooltip("Opening time at normal walking speed.")]
     [SerializeField] private float baseDuration = 0.8f;
-    [Tooltip("Reference walk speed to scale rotation timing from.")]
+
+    [Tooltip("Reference walking speed.")]
     [SerializeField] private float referenceWalkSpeed = 5f;
 
+    [Tooltip("Maximum speed multiplier when moving quickly.")]
+    [SerializeField] private float maxSpeedMultiplier = 3.5f;
+
+    [Tooltip("Fastest possible door swing duration.")]
+    [SerializeField] private float minimumDuration = 0.12f;
+
     [Header("Proximity Auto-Open")]
-    [Tooltip("If true, the door swings open automatically when entering a trigger collider.")]
     [SerializeField] private bool autoOpenOnApproach = true;
-    [Tooltip("Automatically closes when player leaves the trigger zone.")]
     [SerializeField] private bool autoCloseOnExit = true;
 
     [Header("Audio (Optional)")]
@@ -26,15 +33,18 @@ public class DoorController : MonoBehaviour, IInteractable
     [SerializeField] private AudioClip openSfx;
     [SerializeField] private AudioClip closeSfx;
 
-    public string InteractionPrompt => isOpen ? "Press E to Close" : "Press E to Open";
+    public string InteractionPrompt =>
+        isOpen ? "Press E to Close" : "Press E to Open";
 
     private Quaternion closedRotation;
     private Quaternion openRotation;
-    private bool isOpen = false;
-    private Coroutine currentSwingCoroutine;
-    private int collidersInside = 0;
 
-    private Transform TargetHinge => hingeTransform != null ? hingeTransform : transform;
+    private bool isOpen;
+    private Coroutine currentSwingCoroutine;
+    private int collidersInside;
+
+    private Transform TargetHinge =>
+        hingeTransform != null ? hingeTransform : transform;
 
     private void Awake()
     {
@@ -43,65 +53,99 @@ public class DoorController : MonoBehaviour, IInteractable
 
     public void Interact(InteractionContext context)
     {
+        float speed = context.MovementSpeed;
+
         if (isOpen)
         {
-            CloseDoor(context.MovementSpeed);
+            CloseDoor(speed);
         }
         else
         {
-            Vector3 interactorPos = context.Interactor != null 
-                ? context.Interactor.transform.position 
+            Vector3 interactorPosition = context.Interactor != null
+                ? context.Interactor.transform.position
                 : transform.position - transform.right;
 
-            OpenDoor(interactorPos, context.MovementSpeed);
+            OpenDoor(interactorPosition, speed);
         }
     }
 
-public void OpenDoor(Vector3 approacherPosition, float interactorSpeed = 0f)
+    public void OpenDoor(
+        Vector3 approacherPosition,
+        float interactorSpeed = 0f)
     {
-        if (isOpen) return;
+        if (isOpen)
+            return;
 
-        // Use transform.right (X axis) because this model faces along the Red axis
-        Vector3 directionToPlayer = (approacherPosition - transform.position).normalized;
-        float dotProduct = Vector3.Dot(transform.right, directionToPlayer);
+        Vector3 directionToPlayer =
+            (approacherPosition - transform.position).normalized;
 
-        // Inverted: swings away from the player on both sides
-        float swingAngle = dotProduct >= 0f ? -openAngle : openAngle;
+        float dotProduct = Vector3.Dot(
+            transform.right,
+            directionToPlayer
+        );
 
-        openRotation = closedRotation * Quaternion.Euler(0f, swingAngle, 0f);
+        // Swing away from the player.
+        float swingAngle = dotProduct >= 0f
+            ? -openAngle
+            : openAngle;
+
+        openRotation = closedRotation *
+            Quaternion.Euler(0f, swingAngle, 0f);
 
         PlaySfx(openSfx);
         StartSwing(openRotation, interactorSpeed);
+
         isOpen = true;
     }
 
     public void CloseDoor(float interactorSpeed = 0f)
     {
-        if (!isOpen) return;
+        if (!isOpen)
+            return;
 
         PlaySfx(closeSfx);
         StartSwing(closedRotation, interactorSpeed);
+
         isOpen = false;
     }
 
-    private void StartSwing(Quaternion targetRotation, float interactorSpeed)
+    private void StartSwing(
+        Quaternion targetRotation,
+        float interactorSpeed)
     {
         if (currentSwingCoroutine != null)
         {
             StopCoroutine(currentSwingCoroutine);
+            currentSwingCoroutine = null;
         }
 
-        float duration = baseDuration;
-        if (interactorSpeed > referenceWalkSpeed && referenceWalkSpeed > 0f)
-        {
-            float speedMultiplier = interactorSpeed / referenceWalkSpeed;
-            duration = Mathf.Max(0.2f, baseDuration / speedMultiplier);
-        }
+        float safeReferenceSpeed =
+            Mathf.Max(0.1f, referenceWalkSpeed);
 
-        currentSwingCoroutine = StartCoroutine(SmoothSwing(targetRotation, duration));
+        float speedRatio =
+            Mathf.Max(0f, interactorSpeed) / safeReferenceSpeed;
+
+        // Normal walking speed uses the normal duration.
+        // Higher speeds shorten the duration.
+        float speedMultiplier = Mathf.Lerp(
+            1f,
+            Mathf.Max(1f, maxSpeedMultiplier),
+            Mathf.Clamp01((speedRatio - 1f) / 2f)
+        );
+
+        float duration = Mathf.Max(
+            minimumDuration,
+            baseDuration / speedMultiplier
+        );
+
+        currentSwingCoroutine = StartCoroutine(
+            SmoothSwing(targetRotation, duration)
+        );
     }
 
-    private IEnumerator SmoothSwing(Quaternion targetRotation, float duration)
+    private IEnumerator SmoothSwing(
+        Quaternion targetRotation,
+        float duration)
     {
         Quaternion startRotation = TargetHinge.localRotation;
         float elapsed = 0f;
@@ -109,10 +153,18 @@ public void OpenDoor(Vector3 approacherPosition, float interactorSpeed = 0f)
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / duration);
-            t = t * t * (3f - 2f * t);
 
-            TargetHinge.localRotation = Quaternion.Slerp(startRotation, targetRotation, t);
+            float t = Mathf.Clamp01(elapsed / duration);
+
+            // Starts quickly and eases into the final position.
+            float easedT = 1f - Mathf.Pow(1f - t, 3f);
+
+            TargetHinge.localRotation = Quaternion.Slerp(
+                startRotation,
+                targetRotation,
+                easedT
+            );
+
             yield return null;
         }
 
@@ -130,18 +182,16 @@ public void OpenDoor(Vector3 approacherPosition, float interactorSpeed = 0f)
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!autoOpenOnApproach) return;
+        if (!autoOpenOnApproach)
+            return;
 
-        if (other.CompareTag("Player") || other.GetComponentInParent<CharacterController>() != null)
+        if (IsPlayerCollider(other))
         {
             collidersInside++;
 
             if (!isOpen)
             {
-                float speed = 0f;
-                var cc = other.GetComponentInParent<CharacterController>();
-                if (cc != null) speed = cc.velocity.magnitude;
-
+                float speed = GetPlayerSpeed(other);
                 OpenDoor(other.transform.position, speed);
             }
         }
@@ -149,21 +199,40 @@ public void OpenDoor(Vector3 approacherPosition, float interactorSpeed = 0f)
 
     private void OnTriggerExit(Collider other)
     {
-        if (!autoOpenOnApproach || !autoCloseOnExit) return;
+        if (!autoOpenOnApproach || !autoCloseOnExit)
+            return;
 
-        if (other.CompareTag("Player") || other.GetComponentInParent<CharacterController>() != null)
+        if (IsPlayerCollider(other))
         {
             collidersInside = Mathf.Max(0, collidersInside - 1);
 
-            // Only close if all parts of the player have exited the trigger volume
             if (collidersInside == 0 && isOpen)
             {
-                float speed = 0f;
-                var cc = other.GetComponentInParent<CharacterController>();
-                if (cc != null) speed = cc.velocity.magnitude;
-
-                CloseDoor(speed);
+                CloseDoor(GetPlayerSpeed(other));
             }
         }
+    }
+
+    private bool IsPlayerCollider(Collider other)
+    {
+        return other.CompareTag("Player") ||
+               other.GetComponentInParent<CharacterController>() != null;
+    }
+
+    private float GetPlayerSpeed(Collider other)
+    {
+        CharacterController cc =
+            other.GetComponentInParent<CharacterController>();
+
+        if (cc != null)
+        {
+            // Horizontal speed is more relevant to door interactions.
+            Vector3 velocity = cc.velocity;
+            velocity.y = 0f;
+
+            return velocity.magnitude;
+        }
+
+        return 0f;
     }
 }

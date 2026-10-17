@@ -280,6 +280,38 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+      propertyPath: walkSpeed
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+      propertyPath: sprintSpeed
+      value: 9.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+      propertyPath: acceleration
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+      propertyPath: cameraOffset
+      value: 
+      objectReference: {fileID: 1246286225}
+    - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+      propertyPath: slideFriction
+      value: 3.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+      propertyPath: slideCameraDrop
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+      propertyPath: normalDeceleration
+      value: 18
+      objectReference: {fileID: 0}
+    - target: {fileID: 7074547376920175880, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+      propertyPath: sprintReleaseDeceleration
+      value: 7
+      objectReference: {fileID: 0}
     - target: {fileID: 8603939943847798715, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
       propertyPath: m_Name
       value: PlayerRoot
@@ -454,6 +486,11 @@ MonoBehaviour:
 --- !u!20 &1227281076 stripped
 Camera:
   m_CorrespondingSourceObject: {fileID: 659143663588334460, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
+  m_PrefabInstance: {fileID: 336789475}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1246286225 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5974597980177672924, guid: c6a6c3aeaffbe7c49af7cfda33d8bf80, type: 3}
   m_PrefabInstance: {fileID: 336789475}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &1735920732
@@ -2969,12 +3006,14 @@ MonoBehaviour:
   playerRoot: {fileID: 910087575}
   playerController: {fileID: 910087574}
   playerCamera: {fileID: 1227281076}
+  dustParticles: {fileID: 1947132849}
+  rockParticles: {fileID: 0}
   movementScriptsToDisable:
   - {fileID: 910087573}
   - {fileID: 996691131}
-  delayBeforeEarthquake: 2
-  earthquakeDuration: 10
-  extraSurvivalTime: 5
+  delayBeforeEarthquake: 10
+  earthquakeDuration: 4
+  extraSurvivalTime: 2
   pauseBetweenEarthquakes: 3
   cameraShakeAmount: 0.1
   shakeSpeed: 10
