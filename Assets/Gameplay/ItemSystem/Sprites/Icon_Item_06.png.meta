@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 0353aac667eb53d4795a748d972f3c33
+guid: cbfb8fc65a9e19740a3617ab3a5a3aee
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 3708669516251805503
-    second: Icon_Item_06_0
+      213: -5795630938570198418
+    second: bandagee_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -115,13 +115,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Icon_Item_06_0
+      name: bandagee_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 512
-        height: 512
+        width: 744
+        height: 744
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -130,8 +130,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f3732819647d77330800000000000000
-      internalID: 3708669516251805503
+      spriteID: e6272413e58c19fa0800000000000000
+      internalID: -5795630938570198418
       vertices: []
       indices: 
       edges: []
@@ -150,7 +150,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Icon_Item_06_0: 3708669516251805503
+      bandagee_0: -5795630938570198418
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 7fd685776966ce14cbdb647b15e6e341
+guid: 9d61fe0a936285241924fb6820dc130e
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 3263367213166067144
-    second: Icon_Item_02_0
+      213: 965360322618789697
+    second: medkit_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -115,13 +115,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Icon_Item_02_0
+      name: medkit_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 512
-        height: 512
+        width: 741
+        height: 741
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -130,8 +130,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 8cd7b68b03fc94d20800000000000000
-      internalID: 3263367213166067144
+      spriteID: 14f03f54916a56d00800000000000000
+      internalID: 965360322618789697
       vertices: []
       indices: 
       edges: []
@@ -150,7 +150,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Icon_Item_02_0: 3263367213166067144
+      medkit_0: 965360322618789697
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
