@@ -10,8 +10,12 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 554984387891290699, guid: 85eec068382982e42b56b94c648dc857, type: 3}
       propertyPath: m_Name
-      value: PF_CollectibleItem
+      value: PF_Item_04
       objectReference: {fileID: 0}
+    - target: {fileID: 4100648610180840066, guid: 85eec068382982e42b56b94c648dc857, type: 3}
+      propertyPath: itemData
+      value: 
+      objectReference: {fileID: 11400000, guid: 70d1313b4f11e8942b53b22b1b8b92f8, type: 2}
     - target: {fileID: 8801903481646390010, guid: 85eec068382982e42b56b94c648dc857, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
