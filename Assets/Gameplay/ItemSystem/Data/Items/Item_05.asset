@@ -15,5 +15,5 @@ MonoBehaviour:
   itemID: item_05
   displayName: Item 5
   itemType: 0
-  icon: {fileID: -8587553186465405971, guid: 029991fcd55dbb141b1114dc9a40bd77, type: 3}
+  icon: {fileID: -5913738696227704600, guid: fb933c12e3ba9c249b004c258ebf9cd9, type: 3}
   worldPrefab: {fileID: 0}
