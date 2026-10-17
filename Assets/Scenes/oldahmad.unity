@@ -3011,9 +3011,9 @@ MonoBehaviour:
   movementScriptsToDisable:
   - {fileID: 910087573}
   - {fileID: 996691131}
-  delayBeforeEarthquake: 10
-  earthquakeDuration: 4
-  extraSurvivalTime: 2
+  delayBeforeEarthquake: 5
+  earthquakeDuration: 6
+  extraSurvivalTime: 3
   pauseBetweenEarthquakes: 3
   cameraShakeAmount: 0.1
   shakeSpeed: 10
