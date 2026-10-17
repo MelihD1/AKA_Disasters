@@ -32,6 +32,7 @@ public class DoorController : MonoBehaviour, IInteractable
     private Quaternion openRotation;
     private bool isOpen = false;
     private Coroutine currentSwingCoroutine;
+    private int collidersInside = 0;
 
     private Transform TargetHinge => hingeTransform != null ? hingeTransform : transform;
 
@@ -48,16 +49,23 @@ public class DoorController : MonoBehaviour, IInteractable
         }
         else
         {
-            OpenDoor(context.Interactor != null ? context.Interactor.transform.position : transform.position - transform.forward, context.MovementSpeed);
+            Vector3 interactorPos = context.Interactor != null 
+                ? context.Interactor.transform.position 
+                : transform.position - transform.right;
+
+            OpenDoor(interactorPos, context.MovementSpeed);
         }
     }
 
-    public void OpenDoor(Vector3 approacherPosition, float interactorSpeed = 0f)
+public void OpenDoor(Vector3 approacherPosition, float interactorSpeed = 0f)
     {
         if (isOpen) return;
 
+        // Use transform.right (X axis) because this model faces along the Red axis
         Vector3 directionToPlayer = (approacherPosition - transform.position).normalized;
-        float dotProduct = Vector3.Dot(transform.forward, directionToPlayer);
+        float dotProduct = Vector3.Dot(transform.right, directionToPlayer);
+
+        // Inverted: swings away from the player on both sides
         float swingAngle = dotProduct >= 0f ? -openAngle : openAngle;
 
         openRotation = closedRotation * Quaternion.Euler(0f, swingAngle, 0f);
@@ -122,29 +130,40 @@ public class DoorController : MonoBehaviour, IInteractable
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!autoOpenOnApproach || isOpen) return;
+        if (!autoOpenOnApproach) return;
 
         if (other.CompareTag("Player") || other.GetComponentInParent<CharacterController>() != null)
         {
-            float speed = 0f;
-            var cc = other.GetComponentInParent<CharacterController>();
-            if (cc != null) speed = cc.velocity.magnitude;
+            collidersInside++;
 
-            OpenDoor(other.transform.position, speed);
+            if (!isOpen)
+            {
+                float speed = 0f;
+                var cc = other.GetComponentInParent<CharacterController>();
+                if (cc != null) speed = cc.velocity.magnitude;
+
+                OpenDoor(other.transform.position, speed);
+            }
         }
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (!autoOpenOnApproach || !autoCloseOnExit || !isOpen) return;
+        if (!autoOpenOnApproach || !autoCloseOnExit) return;
 
         if (other.CompareTag("Player") || other.GetComponentInParent<CharacterController>() != null)
         {
-            float speed = 0f;
-            var cc = other.GetComponentInParent<CharacterController>();
-            if (cc != null) speed = cc.velocity.magnitude;
+            collidersInside = Mathf.Max(0, collidersInside - 1);
 
-            CloseDoor(speed);
+            // Only close if all parts of the player have exited the trigger volume
+            if (collidersInside == 0 && isOpen)
+            {
+                float speed = 0f;
+                var cc = other.GetComponentInParent<CharacterController>();
+                if (cc != null) speed = cc.velocity.magnitude;
+
+                CloseDoor(speed);
+            }
         }
     }
 }
