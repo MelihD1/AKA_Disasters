@@ -1,51 +1,30 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class PlayerInteractor : MonoBehaviour
 {
+    [Header("Dependencies")]
+    [Tooltip("Target optical camera to raycast from (Main Camera). Factored for head bob & recoil.")]
+    [SerializeField] private Camera playerCamera;
+    [SerializeField] private PlayerInputReader inputReader;
+    [SerializeField] private CharacterController characterController;
+
     [Header("Detection Settings")]
-    [Tooltip("Maximum distance to interact with objects.")]
     [SerializeField] private float reachDistance = 3f;
-    [Tooltip("Layer mask filtering interactable objects.")]
     [SerializeField] private LayerMask interactableLayer;
-
-    [Header("Input (Optional Reference)")]
-    [Tooltip("Optional Input Action Reference for Interact. If empty, falls back to Keyboard 'E'.")]
-    [SerializeField] private InputActionReference interactAction;
-
-    [Header("UI / Debug Prompt")]
     [SerializeField] private bool showDebugRay = true;
 
-    private Camera cam;
-    private CharacterController characterController;
     private IInteractable currentInteractable;
 
     private void Awake()
     {
-        cam = GetComponent<Camera>();
-        if (cam == null)
-        {
-            cam = Camera.main;
-        }
+        if (playerCamera == null)
+            playerCamera = GetComponentInChildren<Camera>();
 
-        // Cache CharacterController from the player root to read real-time movement speed
-        characterController = GetComponentInParent<CharacterController>();
-    }
+        if (inputReader == null)
+            inputReader = GetComponent<PlayerInputReader>();
 
-    private void OnEnable()
-    {
-        if (interactAction != null && interactAction.action != null)
-        {
-            interactAction.action.Enable();
-        }
-    }
-
-    private void OnDisable()
-    {
-        if (interactAction != null && interactAction.action != null)
-        {
-            interactAction.action.Disable();
-        }
+        if (characterController == null)
+            characterController = GetComponent<CharacterController>();
     }
 
     private void Update()
@@ -56,7 +35,9 @@ public class PlayerInteractor : MonoBehaviour
 
     private void DetectInteractable()
     {
-        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+        if (playerCamera == null) return;
+
+        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
         RaycastHit hit;
 
         if (showDebugRay)
@@ -66,13 +47,8 @@ public class PlayerInteractor : MonoBehaviour
 
         if (Physics.Raycast(ray, out hit, reachDistance, interactableLayer))
         {
-            // Check the hit object or its parent for an IInteractable component
-            IInteractable interactable = hit.collider.GetComponentInParent<IInteractable>();
-            if (interactable == null)
-            {
-                interactable = hit.collider.GetComponent<IInteractable>();
-            }
-
+            IInteractable interactable = hit.collider.GetComponentInParent<IInteractable>() 
+                                      ?? hit.collider.GetComponent<IInteractable>();
             currentInteractable = interactable;
         }
         else
@@ -83,30 +59,27 @@ public class PlayerInteractor : MonoBehaviour
 
     private void HandleInput()
     {
-        bool wasTriggered = false;
+        // 1. Guard: Ignore interaction if cursor is unlocked (menus/UI)
+        if (Cursor.lockState != CursorLockMode.Locked) return;
 
-        // Check assigned Input Action first
-        if (interactAction != null && interactAction.action != null)
-        {
-            wasTriggered = interactAction.action.WasPressedThisFrame();
-        }
-        // Fallback to direct 'E' key press to keep it failproof
-        else if (Keyboard.current != null)
-        {
-            wasTriggered = Keyboard.current.eKey.wasPressedThisFrame;
-        }
+        // 2. Guard: Respect disabled input during cutscenes/dialogue
+        if (inputReader != null && !inputReader.enabled) return;
 
-        if (wasTriggered && currentInteractable != null)
+        // 3. Fallback/Direct check for 'E'
+        bool interactPressed = UnityEngine.InputSystem.Keyboard.current != null 
+                               && UnityEngine.InputSystem.Keyboard.current.eKey.wasPressedThisFrame;
+
+        if (interactPressed && currentInteractable != null)
         {
+            // Planar horizontal speed only (ignores jump/gravity inflation)
             float speed = 0f;
             if (characterController != null)
             {
-                speed = characterController.velocity.magnitude;
+                Vector3 flatVel = new Vector3(characterController.velocity.x, 0f, characterController.velocity.z);
+                speed = flatVel.magnitude;
             }
 
-            GameObject interactorObj = characterController != null ? characterController.gameObject : gameObject;
-            InteractionContext context = new InteractionContext(interactorObj, speed);
-
+            InteractionContext context = new InteractionContext(gameObject, speed);
             currentInteractable.Interact(context);
         }
     }
