@@ -9,6 +9,10 @@ public class EarthquakeEvent : MonoBehaviour
     public CharacterController playerController;
     public Camera playerCamera;
 
+    [Header("Earthquake Particles")]
+    public ParticleSystem dustParticles;
+    public ParticleSystem rockParticles;
+
     [Header("Existing Movement Scripts")]
     public Behaviour[] movementScriptsToDisable;
 
@@ -39,6 +43,7 @@ public class EarthquakeEvent : MonoBehaviour
     public bool PlayerLost { get; private set; }
 
     private HidingSpot currentHidingSpot;
+
     private Vector3 hidingPosition;
     private Quaternion hidingRotation;
 
@@ -49,15 +54,20 @@ public class EarthquakeEvent : MonoBehaviour
     private Vector3 targetDriftVelocity;
     private Vector3 driftVelocityChange;
 
-    private Vector3 cameraOriginalPosition;
     private Vector3 lastCameraShake;
+
+    private Vector3 cameraOriginalPosition;
 
     private bool[] originalMovementStates;
 
     private void Start()
     {
+        if (movementScriptsToDisable == null)
+            movementScriptsToDisable = new Behaviour[0];
+
         if (playerController == null && playerRoot != null)
-            playerController = playerRoot.GetComponent<CharacterController>();
+            playerController =
+                playerRoot.GetComponent<CharacterController>();
 
         if (playerRoot == null && playerController != null)
             playerRoot = playerController.transform;
@@ -66,7 +76,8 @@ public class EarthquakeEvent : MonoBehaviour
             playerCamera = Camera.main;
 
         if (playerCamera != null)
-            cameraOriginalPosition = playerCamera.transform.localPosition;
+            cameraOriginalPosition =
+                playerCamera.transform.localPosition;
 
         originalMovementStates =
             new bool[movementScriptsToDisable.Length];
@@ -74,16 +85,20 @@ public class EarthquakeEvent : MonoBehaviour
         for (int i = 0; i < movementScriptsToDisable.Length; i++)
         {
             if (movementScriptsToDisable[i] != null)
+            {
                 originalMovementStates[i] =
                     movementScriptsToDisable[i].enabled;
+            }
         }
+
+        StopEarthquakeParticles();
 
         StartCoroutine(EarthquakeLoop());
     }
 
     private IEnumerator EarthquakeLoop()
     {
-        // Initial delay, followed by repeating earthquakes.
+        // Initial delay before the first earthquake.
         yield return new WaitForSeconds(delayBeforeEarthquake);
 
         while (!PlayerLost)
@@ -96,21 +111,23 @@ public class EarthquakeEvent : MonoBehaviour
             targetDriftVelocity = Vector3.zero;
             driftVelocityChange = Vector3.zero;
 
-            // Wait until the earthquake finishes or the player loses.
+            // Dust starts when each earthquake begins.
+            if (dustParticles != null)
+                dustParticles.Play();
+
+            // Wait for the event to finish or the player to lose.
             while (EarthquakeActive && !PlayerLost)
                 yield return null;
 
             if (PlayerLost)
                 yield break;
 
-            // The player successfully survived this earthquake.
-            // No victory message: just a short quiet interval.
+            // Quiet interval between earthquakes.
             RestoreCameraShake();
 
-            yield return new WaitForSeconds(pauseBetweenEarthquakes);
-
-            if (PlayerLost)
-                yield break;
+            yield return new WaitForSeconds(
+                pauseBetweenEarthquakes
+            );
         }
     }
 
@@ -121,6 +138,14 @@ public class EarthquakeEvent : MonoBehaviour
 
         elapsed += Time.deltaTime;
 
+        // Start rocks at the deadly phase.
+        if (elapsed >= earthquakeDuration &&
+            rockParticles != null &&
+            !rockParticles.isPlaying)
+        {
+            rockParticles.Play();
+        }
+
         // Exposed players lose at the original deadline.
         if (elapsed >= earthquakeDuration && !IsHiding)
         {
@@ -128,13 +153,17 @@ public class EarthquakeEvent : MonoBehaviour
             return;
         }
 
-        // A player who stays hidden survives the extended event.
+        // Hidden players survive the extended earthquake.
         if (elapsed >= earthquakeDuration + extraSurvivalTime)
         {
             if (IsHiding)
+            {
                 FinishEarthquakeCycle();
+            }
             else
+            {
                 EndEventAsLoss();
+            }
         }
     }
 
@@ -146,7 +175,9 @@ public class EarthquakeEvent : MonoBehaviour
         float totalDuration =
             earthquakeDuration + extraSurvivalTime;
 
-        float progress = Mathf.Clamp01(elapsed / totalDuration);
+        float progress = Mathf.Clamp01(
+            elapsed / totalDuration
+        );
 
         // Smoothly ramp intensity from weak to strong.
         float easedProgress =
@@ -175,7 +206,7 @@ public class EarthquakeEvent : MonoBehaviour
             lastCameraShake = newShake;
         }
 
-        // Keep the hidden player completely stationary.
+        // Hidden players do not receive earthquake drift.
         if (IsHiding)
         {
             if (playerRoot != null)
@@ -187,6 +218,7 @@ public class EarthquakeEvent : MonoBehaviour
             return;
         }
 
+        // Choose a new horizontal drift direction.
         if (Time.time >= nextDirectionChange)
         {
             Vector2 direction = Random.insideUnitCircle.normalized;
@@ -195,7 +227,9 @@ public class EarthquakeEvent : MonoBehaviour
                 direction = Vector2.right;
 
             targetDriftVelocity = new Vector3(
-                direction.x, 0f, direction.y
+                direction.x,
+                0f,
+                direction.y
             ) * maxDriftSpeed * intensity;
 
             nextDirectionChange =
@@ -211,7 +245,9 @@ public class EarthquakeEvent : MonoBehaviour
 
         if (playerController != null)
         {
-            playerController.Move(driftVelocity * Time.deltaTime);
+            playerController.Move(
+                driftVelocity * Time.deltaTime
+            );
         }
     }
 
@@ -252,7 +288,7 @@ public class EarthquakeEvent : MonoBehaviour
 
         RestoreMovementScripts();
 
-        // Leaving after the original death deadline causes a loss.
+        // Leaving after the original deadline means losing.
         if (EarthquakeActive && elapsed >= earthquakeDuration)
             EndEventAsLoss();
     }
@@ -261,7 +297,10 @@ public class EarthquakeEvent : MonoBehaviour
     {
         EarthquakeActive = false;
 
-        // Let the player move and leave the hiding spot again.
+        StopEarthquakeParticles();
+        RestoreCameraShake();
+
+        // Allow the player to move again after surviving.
         if (IsHiding)
         {
             IsHiding = false;
@@ -272,8 +311,6 @@ public class EarthquakeEvent : MonoBehaviour
         driftVelocity = Vector3.zero;
         targetDriftVelocity = Vector3.zero;
         driftVelocityChange = Vector3.zero;
-
-        RestoreCameraShake();
     }
 
     private void EndEventAsLoss()
@@ -281,9 +318,9 @@ public class EarthquakeEvent : MonoBehaviour
         EarthquakeActive = false;
         PlayerLost = true;
 
+        StopEarthquakeParticles();
         RestoreCameraShake();
 
-        // Stop the player remaining frozen after losing.
         if (IsHiding)
         {
             IsHiding = false;
@@ -292,13 +329,34 @@ public class EarthquakeEvent : MonoBehaviour
         }
     }
 
+    private void StopEarthquakeParticles()
+    {
+        if (dustParticles != null)
+        {
+            dustParticles.Stop(
+                true,
+                ParticleSystemStopBehavior.StopEmittingAndClear
+            );
+        }
+
+        if (rockParticles != null)
+        {
+            rockParticles.Stop(
+                true,
+                ParticleSystemStopBehavior.StopEmittingAndClear
+            );
+        }
+    }
+
     private void RestoreMovementScripts()
     {
         for (int i = 0; i < movementScriptsToDisable.Length; i++)
         {
             if (movementScriptsToDisable[i] != null)
+            {
                 movementScriptsToDisable[i].enabled =
                     originalMovementStates[i];
+            }
         }
     }
 
