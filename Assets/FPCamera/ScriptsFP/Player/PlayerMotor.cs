@@ -27,16 +27,20 @@ public class PlayerMotor : MonoBehaviour
     [SerializeField] private float gravity = -20f;
     [SerializeField] private float jumpHeight = 1.4f;
 
+    [Header("Crouching")]
+    [SerializeField] private float crouchSpeed = 3f;
+    [SerializeField] private float crouchHeight = 1.2f;
+    [SerializeField] private float crouchCameraDrop = 0.35f;
+    [SerializeField] private float crouchTransitionSpeed = 10f;
+
     [Header("Sliding")]
     [SerializeField] private float slideStartSpeed = 8f;
     [SerializeField] private float slideFriction = 5.5f;
     [SerializeField] private float slideSteering = 8f;
     [SerializeField] private float slideHeight = 1.1f;
-    [SerializeField] private float heightChangeSpeed = 8f;
-
-    [Header("Slide Camera")]
     [SerializeField] private float slideCameraDrop = 0.45f;
-    [SerializeField] private float cameraTransitionSpeed = 10f;
+    [SerializeField] private float heightChangeSpeed = 8f;
+    [SerializeField] private float slideCameraTransitionSpeed = 10f;
 
     private CharacterController controller;
     private Vector3 verticalVelocity;
@@ -50,8 +54,11 @@ public class PlayerMotor : MonoBehaviour
     private bool cameraPositionSaved;
 
     private bool isSliding;
+    private bool isCrouching;
+    private bool controlWasHeld;
 
     public bool IsSliding => isSliding;
+    public bool IsCrouching => isCrouching;
 
     private void Awake()
     {
@@ -64,10 +71,12 @@ public class PlayerMotor : MonoBehaviour
         originalCenter = controller.center;
         currentHeight = originalHeight;
 
+        crouchHeight = Mathf.Clamp(
+            crouchHeight, controller.radius * 2f, originalHeight
+        );
+
         slideHeight = Mathf.Clamp(
-            slideHeight,
-            controller.radius * 2f,
-            originalHeight
+            slideHeight, controller.radius * 2f, crouchHeight
         );
 
         if (cameraOffset != null)
@@ -84,12 +93,58 @@ public class PlayerMotor : MonoBehaviour
 
         bool grounded = controller.isGrounded;
 
-        UpdateSlideInput(grounded);
+        UpdateCrouchAndSlideInput(grounded);
         ApplyMovement(grounded);
         ApplyGravityAndJump(grounded);
         UpdateControllerHeight();
-        UpdateSlideCamera();
+        UpdateCameraPosition();
     }
+
+
+
+    private void UpdateCrouchAndSlideInput(bool grounded)
+    {
+        bool controlHeld = IsControlHeld();
+
+        Vector3 actualVelocity = controller.velocity;
+        actualVelocity.y = 0f;
+
+        float actualSpeed = Mathf.Max(
+            horizontalVelocity.magnitude,
+            actualVelocity.magnitude
+        );
+
+        if (!controlHeld)
+        {
+            isSliding = false;
+            isCrouching = false;
+        }
+        else if (isSliding)
+        {
+            // Keep sliding until Ctrl is released or we leave the ground.
+            if (!grounded)
+            {
+                isSliding = false;
+                isCrouching = true;
+            }
+        }
+        else if (grounded && actualSpeed >= slideStartSpeed)
+        {
+            // Check continuously while Ctrl is held, not just on key press.
+            isSliding = true;
+            isCrouching = false;
+        }
+        else
+        {
+            // At low speed, Ctrl crouches.
+            isSliding = false;
+            isCrouching = true;
+        }
+
+        controlWasHeld = controlHeld;
+    }
+
+
 
     private void ApplyMovement(bool grounded)
     {
@@ -108,22 +163,19 @@ public class PlayerMotor : MonoBehaviour
 
         if (isSliding)
         {
-            // Keep momentum during a slide, with steering.
             if (direction.sqrMagnitude > 0.001f)
             {
                 Vector3 steeringTarget =
                     direction * horizontalVelocity.magnitude;
 
                 horizontalVelocity = Vector3.MoveTowards(
-                    horizontalVelocity,
-                    steeringTarget,
+                    horizontalVelocity, steeringTarget,
                     slideSteering * Time.deltaTime
                 );
             }
 
             horizontalVelocity = Vector3.MoveTowards(
-                horizontalVelocity,
-                Vector3.zero,
+                horizontalVelocity, Vector3.zero,
                 slideFriction * Time.deltaTime
             );
         }
@@ -131,17 +183,15 @@ public class PlayerMotor : MonoBehaviour
         {
             float currentSpeed = horizontalVelocity.magnitude;
 
-            float targetSpeed = inputReader.IsSprinting
-                ? sprintSpeed
-                : walkSpeed;
+            float targetSpeed = isCrouching
+                ? crouchSpeed
+                : inputReader.IsSprinting ? sprintSpeed : walkSpeed;
 
-            // Preserve some sprint speed after Shift is released.
-            if (!inputReader.IsSprinting &&
+            if (!isCrouching && !inputReader.IsSprinting &&
                 currentSpeed > walkSpeed)
             {
                 targetSpeed = Mathf.MoveTowards(
-                    currentSpeed,
-                    walkSpeed,
+                    currentSpeed, walkSpeed,
                     sprintReleaseDeceleration * Time.deltaTime
                 );
             }
@@ -149,13 +199,8 @@ public class PlayerMotor : MonoBehaviour
             Vector3 targetVelocity = direction * targetSpeed;
             float control = grounded ? 1f : airControl;
 
-            // Quickly remove velocity in the old direction
-            // when making a sharp turn or a 180-degree reversal.
             float directionDot = currentSpeed > 0.1f
-                ? Vector3.Dot(
-                    horizontalVelocity.normalized,
-                    direction
-                )
+                ? Vector3.Dot(horizontalVelocity.normalized, direction)
                 : 1f;
 
             float turnRate = directionDot < 0.5f
@@ -163,8 +208,7 @@ public class PlayerMotor : MonoBehaviour
                 : acceleration;
 
             horizontalVelocity = Vector3.MoveTowards(
-                horizontalVelocity,
-                targetVelocity,
+                horizontalVelocity, targetVelocity,
                 turnRate * control * Time.deltaTime
             );
         }
@@ -172,10 +216,8 @@ public class PlayerMotor : MonoBehaviour
         {
             float control = grounded ? 1f : airControl;
 
-            // Stop smoothly when no directional input is held.
             horizontalVelocity = Vector3.MoveTowards(
-                horizontalVelocity,
-                Vector3.zero,
+                horizontalVelocity, Vector3.zero,
                 normalDeceleration * control * Time.deltaTime
             );
         }
@@ -183,30 +225,13 @@ public class PlayerMotor : MonoBehaviour
         controller.Move(horizontalVelocity * Time.deltaTime);
     }
 
-    private void UpdateSlideInput(bool grounded)
-    {
-        bool controlHeld = IsControlHeld();
-
-        if (!isSliding &&
-            controlHeld &&
-            grounded &&
-            horizontalVelocity.magnitude >= slideStartSpeed)
-        {
-            isSliding = true;
-        }
-
-        if (isSliding && (!controlHeld || !grounded))
-        {
-            isSliding = false;
-        }
-    }
-
     private void ApplyGravityAndJump(bool grounded)
     {
         if (grounded && verticalVelocity.y < 0f)
             verticalVelocity.y = -2f;
 
-        if (grounded && !isSliding && inputReader.JumpTriggered)
+        if (grounded && !isSliding && !isCrouching &&
+            inputReader.JumpTriggered)
         {
             verticalVelocity.y = Mathf.Sqrt(
                 jumpHeight * -2f * gravity
@@ -214,7 +239,6 @@ public class PlayerMotor : MonoBehaviour
         }
 
         verticalVelocity.y += gravity * Time.deltaTime;
-
         controller.Move(verticalVelocity * Time.deltaTime);
     }
 
@@ -222,18 +246,13 @@ public class PlayerMotor : MonoBehaviour
     {
         float targetHeight = isSliding
             ? slideHeight
-            : originalHeight;
+            : isCrouching ? crouchHeight : originalHeight;
 
-        if (!isSliding &&
-            currentHeight < originalHeight &&
-            !CanStandUp())
-        {
+        if (targetHeight > currentHeight && !CanStandUp())
             targetHeight = currentHeight;
-        }
 
         currentHeight = Mathf.MoveTowards(
-            currentHeight,
-            targetHeight,
+            currentHeight, targetHeight,
             heightChangeSpeed * Time.deltaTime
         );
 
@@ -258,10 +277,7 @@ public class PlayerMotor : MonoBehaviour
             Vector3.up * (originalHeight * 0.5f - radius);
 
         Collider[] hits = Physics.OverlapCapsule(
-            bottom,
-            top,
-            radius,
-            ~0,
+            bottom, top, radius, ~0,
             QueryTriggerInteraction.Ignore
         );
 
@@ -269,9 +285,7 @@ public class PlayerMotor : MonoBehaviour
         {
             if (hit == controller ||
                 hit.transform.IsChildOf(transform))
-            {
                 continue;
-            }
 
             return false;
         }
@@ -279,50 +293,52 @@ public class PlayerMotor : MonoBehaviour
         return true;
     }
 
-    private void UpdateSlideCamera()
+    private void UpdateCameraPosition()
     {
         if (cameraOffset == null || !cameraPositionSaved)
             return;
 
-        Vector3 targetPosition = cameraStandingPosition;
+        float drop = isSliding
+            ? slideCameraDrop
+            : isCrouching ? crouchCameraDrop : 0f;
 
-        if (isSliding)
-            targetPosition.y -= slideCameraDrop;
+        float speed = isSliding
+            ? slideCameraTransitionSpeed
+            : crouchTransitionSpeed;
+
+        Vector3 targetPosition = cameraStandingPosition;
+        targetPosition.y -= drop;
 
         cameraOffset.localPosition = Vector3.Lerp(
             cameraOffset.localPosition,
             targetPosition,
-            1f - Mathf.Exp(
-                -cameraTransitionSpeed * Time.deltaTime
-            )
+            1f - Mathf.Exp(-speed * Time.deltaTime)
         );
     }
 
     private bool IsControlHeld()
     {
 #if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null &&
-            (Keyboard.current.leftCtrlKey.isPressed ||
-             Keyboard.current.rightCtrlKey.isPressed))
+        if (Keyboard.current != null)
         {
-            return true;
+            return Keyboard.current.leftCtrlKey.isPressed ||
+                   Keyboard.current.rightCtrlKey.isPressed;
         }
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKey(KeyCode.LeftControl) ||
-            Input.GetKey(KeyCode.RightControl))
-        {
-            return true;
-        }
-#endif
-
+        return Input.GetKey(KeyCode.LeftControl) ||
+               Input.GetKey(KeyCode.RightControl);
+#else
         return false;
+#endif
     }
 
     private void OnDisable()
     {
         isSliding = false;
+        isCrouching = false;
+        controlWasHeld = false;
         horizontalVelocity = Vector3.zero;
         verticalVelocity = Vector3.zero;
 
