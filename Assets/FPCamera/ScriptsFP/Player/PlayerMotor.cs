@@ -72,11 +72,15 @@ public class PlayerMotor : MonoBehaviour
         currentHeight = originalHeight;
 
         crouchHeight = Mathf.Clamp(
-            crouchHeight, controller.radius * 2f, originalHeight
+            crouchHeight,
+            controller.radius * 2f,
+            originalHeight
         );
 
         slideHeight = Mathf.Clamp(
-            slideHeight, controller.radius * 2f, crouchHeight
+            slideHeight,
+            controller.radius * 2f,
+            crouchHeight
         );
 
         if (cameraOffset != null)
@@ -100,8 +104,6 @@ public class PlayerMotor : MonoBehaviour
         UpdateCameraPosition();
     }
 
-
-
     private void UpdateCrouchAndSlideInput(bool grounded)
     {
         bool controlHeld = IsControlHeld();
@@ -117,11 +119,14 @@ public class PlayerMotor : MonoBehaviour
         if (!controlHeld)
         {
             isSliding = false;
-            isCrouching = false;
+
+            // Keep crouching if the player cannot fit standing up.
+            isCrouching = currentHeight < originalHeight - 0.01f
+                && !CanStandUp();
         }
         else if (isSliding)
         {
-            // Keep sliding until Ctrl is released or we leave the ground.
+            // Continue sliding until Ctrl is released or we leave the ground.
             if (!grounded)
             {
                 isSliding = false;
@@ -130,21 +135,19 @@ public class PlayerMotor : MonoBehaviour
         }
         else if (grounded && actualSpeed >= slideStartSpeed)
         {
-            // Check continuously while Ctrl is held, not just on key press.
+            // Moving fast enough while holding Ctrl starts a slide.
             isSliding = true;
             isCrouching = false;
         }
         else
         {
-            // At low speed, Ctrl crouches.
+            // At lower speeds, Ctrl crouches.
             isSliding = false;
             isCrouching = true;
         }
 
         controlWasHeld = controlHeld;
     }
-
-
 
     private void ApplyMovement(bool grounded)
     {
@@ -169,13 +172,15 @@ public class PlayerMotor : MonoBehaviour
                     direction * horizontalVelocity.magnitude;
 
                 horizontalVelocity = Vector3.MoveTowards(
-                    horizontalVelocity, steeringTarget,
+                    horizontalVelocity,
+                    steeringTarget,
                     slideSteering * Time.deltaTime
                 );
             }
 
             horizontalVelocity = Vector3.MoveTowards(
-                horizontalVelocity, Vector3.zero,
+                horizontalVelocity,
+                Vector3.zero,
                 slideFriction * Time.deltaTime
             );
         }
@@ -185,13 +190,17 @@ public class PlayerMotor : MonoBehaviour
 
             float targetSpeed = isCrouching
                 ? crouchSpeed
-                : inputReader.IsSprinting ? sprintSpeed : walkSpeed;
+                : inputReader.IsSprinting
+                    ? sprintSpeed
+                    : walkSpeed;
 
-            if (!isCrouching && !inputReader.IsSprinting &&
+            if (!isCrouching &&
+                !inputReader.IsSprinting &&
                 currentSpeed > walkSpeed)
             {
                 targetSpeed = Mathf.MoveTowards(
-                    currentSpeed, walkSpeed,
+                    currentSpeed,
+                    walkSpeed,
                     sprintReleaseDeceleration * Time.deltaTime
                 );
             }
@@ -200,7 +209,10 @@ public class PlayerMotor : MonoBehaviour
             float control = grounded ? 1f : airControl;
 
             float directionDot = currentSpeed > 0.1f
-                ? Vector3.Dot(horizontalVelocity.normalized, direction)
+                ? Vector3.Dot(
+                    horizontalVelocity.normalized,
+                    direction
+                )
                 : 1f;
 
             float turnRate = directionDot < 0.5f
@@ -208,7 +220,8 @@ public class PlayerMotor : MonoBehaviour
                 : acceleration;
 
             horizontalVelocity = Vector3.MoveTowards(
-                horizontalVelocity, targetVelocity,
+                horizontalVelocity,
+                targetVelocity,
                 turnRate * control * Time.deltaTime
             );
         }
@@ -217,7 +230,8 @@ public class PlayerMotor : MonoBehaviour
             float control = grounded ? 1f : airControl;
 
             horizontalVelocity = Vector3.MoveTowards(
-                horizontalVelocity, Vector3.zero,
+                horizontalVelocity,
+                Vector3.zero,
                 normalDeceleration * control * Time.deltaTime
             );
         }
@@ -230,7 +244,9 @@ public class PlayerMotor : MonoBehaviour
         if (grounded && verticalVelocity.y < 0f)
             verticalVelocity.y = -2f;
 
-        if (grounded && !isSliding && !isCrouching &&
+        if (grounded &&
+            !isSliding &&
+            !isCrouching &&
             inputReader.JumpTriggered)
         {
             verticalVelocity.y = Mathf.Sqrt(
@@ -246,13 +262,20 @@ public class PlayerMotor : MonoBehaviour
     {
         float targetHeight = isSliding
             ? slideHeight
-            : isCrouching ? crouchHeight : originalHeight;
+            : isCrouching
+                ? crouchHeight
+                : originalHeight;
 
+        // Never increase the collider height unless there is room.
         if (targetHeight > currentHeight && !CanStandUp())
+        {
             targetHeight = currentHeight;
+            isCrouching = true;
+        }
 
         currentHeight = Mathf.MoveTowards(
-            currentHeight, targetHeight,
+            currentHeight,
+            targetHeight,
             heightChangeSpeed * Time.deltaTime
         );
 
@@ -267,17 +290,26 @@ public class PlayerMotor : MonoBehaviour
     {
         float radius = controller.radius * 0.95f;
 
+        // Calculate the full standing capsule in world space.
         Vector3 worldCenter =
             transform.TransformPoint(originalCenter);
 
-        Vector3 bottom = worldCenter +
-            Vector3.up * (-originalHeight * 0.5f + radius);
+        float halfSegment = Mathf.Max(
+            0f,
+            originalHeight * 0.5f - radius
+        );
+
+        Vector3 bottom = worldCenter -
+            Vector3.up * halfSegment;
 
         Vector3 top = worldCenter +
-            Vector3.up * (originalHeight * 0.5f - radius);
+            Vector3.up * halfSegment;
 
         Collider[] hits = Physics.OverlapCapsule(
-            bottom, top, radius, ~0,
+            bottom,
+            top,
+            radius,
+            ~0,
             QueryTriggerInteraction.Ignore
         );
 
@@ -285,7 +317,9 @@ public class PlayerMotor : MonoBehaviour
         {
             if (hit == controller ||
                 hit.transform.IsChildOf(transform))
+            {
                 continue;
+            }
 
             return false;
         }
@@ -300,7 +334,9 @@ public class PlayerMotor : MonoBehaviour
 
         float drop = isSliding
             ? slideCameraDrop
-            : isCrouching ? crouchCameraDrop : 0f;
+            : isCrouching
+                ? crouchCameraDrop
+                : 0f;
 
         float speed = isSliding
             ? slideCameraTransitionSpeed
