@@ -3,6 +3,10 @@ using UnityEngine;
 
 public class DoorController : MonoBehaviour, IInteractable
 {
+    [Header("Hinge Reference")]
+    [Tooltip("The swinging pivot of the door. If left blank, rotates this GameObject.")]
+    [SerializeField] private Transform hingeTransform;
+
     [Header("Door Settings")]
     [Tooltip("Angle relative to closed state (e.g. 90 degrees).")]
     [SerializeField] private float openAngle = 90f;
@@ -29,9 +33,11 @@ public class DoorController : MonoBehaviour, IInteractable
     private bool isOpen = false;
     private Coroutine currentSwingCoroutine;
 
+    private Transform TargetHinge => hingeTransform != null ? hingeTransform : transform;
+
     private void Awake()
     {
-        closedRotation = transform.localRotation;
+        closedRotation = TargetHinge.localRotation;
     }
 
     public void Interact(InteractionContext context)
@@ -50,8 +56,6 @@ public class DoorController : MonoBehaviour, IInteractable
     {
         if (isOpen) return;
 
-        // Calculate direction to player relative to the door's forward vector.
-        // If approaching from front (dot > 0), swing backward (-openAngle). Otherwise swing forward (+openAngle).
         Vector3 directionToPlayer = (approacherPosition - transform.position).normalized;
         float dotProduct = Vector3.Dot(transform.forward, directionToPlayer);
         float swingAngle = dotProduct >= 0f ? -openAngle : openAngle;
@@ -79,7 +83,6 @@ public class DoorController : MonoBehaviour, IInteractable
             StopCoroutine(currentSwingCoroutine);
         }
 
-        // Scale duration based on player speed: faster speed = shorter swing time
         float duration = baseDuration;
         if (interactorSpeed > referenceWalkSpeed && referenceWalkSpeed > 0f)
         {
@@ -92,22 +95,20 @@ public class DoorController : MonoBehaviour, IInteractable
 
     private IEnumerator SmoothSwing(Quaternion targetRotation, float duration)
     {
-        Quaternion startRotation = transform.localRotation;
+        Quaternion startRotation = TargetHinge.localRotation;
         float elapsed = 0f;
 
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
-
-            // SmoothStep curve for natural mechanical acceleration and deceleration
             t = t * t * (3f - 2f * t);
 
-            transform.localRotation = Quaternion.Slerp(startRotation, targetRotation, t);
+            TargetHinge.localRotation = Quaternion.Slerp(startRotation, targetRotation, t);
             yield return null;
         }
 
-        transform.localRotation = targetRotation;
+        TargetHinge.localRotation = targetRotation;
         currentSwingCoroutine = null;
     }
 
@@ -119,7 +120,6 @@ public class DoorController : MonoBehaviour, IInteractable
         }
     }
 
-    // Auto-Open Proximity Triggers
     private void OnTriggerEnter(Collider other)
     {
         if (!autoOpenOnApproach || isOpen) return;
