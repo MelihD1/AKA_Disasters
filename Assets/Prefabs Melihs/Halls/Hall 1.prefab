@@ -28,8 +28,8 @@ Transform:
   m_GameObject: {fileID: 39435771966919752}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 21.920002, y: 0.1500001, z: 0.04}
-  m_LocalScale: {x: 1.0000001, y: 1, z: 1}
+  m_LocalPosition: {x: 21.86, y: 0.1500001, z: 0.04}
+  m_LocalScale: {x: 1.0000001, y: 0.95, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5605165796907947516}
@@ -372,8 +372,8 @@ Transform:
   m_GameObject: {fileID: 1872898814949617550}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 15.840001, y: 0.1500001, z: 5.88}
-  m_LocalScale: {x: 1.0000002, y: 1, z: 1}
+  m_LocalPosition: {x: 15.840001, y: 0.1500001, z: 6.05}
+  m_LocalScale: {x: 1.0000002, y: 0.95, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5605165796907947516}
@@ -602,7 +602,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 21.870003, y: 0.1500001, z: 6.06}
-  m_LocalScale: {x: 1.0000001, y: 1, z: 1}
+  m_LocalScale: {x: 1.0000001, y: 0.95, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5605165796907947516}
@@ -945,8 +945,8 @@ Transform:
   m_GameObject: {fileID: 4013820781313495420}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 9.920001, y: 0.1500001, z: 0.03}
-  m_LocalScale: {x: 1.0000001, y: 1, z: 1}
+  m_LocalPosition: {x: 9.86, y: 0.1500001, z: 0.12}
+  m_LocalScale: {x: 1.0000001, y: 0.95, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5605165796907947516}
@@ -1550,8 +1550,8 @@ Transform:
   m_GameObject: {fileID: 6428854053594604873}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 3.877, y: 0.1500001, z: 0.185}
-  m_LocalScale: {x: 1.0000001, y: 1, z: 1}
+  m_LocalPosition: {x: 3.85, y: 0.1500001, z: 0.04}
+  m_LocalScale: {x: 1.0000001, y: 0.95, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5605165796907947516}
@@ -1895,7 +1895,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 9.86, y: 0.1500001, z: 6.02}
-  m_LocalScale: {x: 1.0000002, y: 1, z: 1}
+  m_LocalScale: {x: 1.0000002, y: 0.95, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5605165796907947516}
@@ -2336,6 +2336,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: -6867524174320841699, guid: 5d8899396fe9e4d42b8ef2f3a137ab0e, type: 3}
     - target: {fileID: 919132149155446097, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
       propertyPath: m_Name
       value: wallDoorway (5)
@@ -2406,6 +2410,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: -6867524174320841699, guid: 5d8899396fe9e4d42b8ef2f3a137ab0e, type: 3}
     - target: {fileID: 919132149155446097, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
       propertyPath: m_Name
       value: wallDoorway (1)
@@ -2617,6 +2625,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: -6867524174320841699, guid: 5d8899396fe9e4d42b8ef2f3a137ab0e, type: 3}
     - target: {fileID: 919132149155446097, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
       propertyPath: m_Name
       value: wallDoorway (3)
@@ -2902,6 +2914,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: -6867524174320841699, guid: 5d8899396fe9e4d42b8ef2f3a137ab0e, type: 3}
     - target: {fileID: 919132149155446097, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
       propertyPath: m_Name
       value: wallDoorway (6)
@@ -2972,6 +2988,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: -6867524174320841699, guid: a197b1a957ec9534395b9b235a8aa035, type: 3}
     - target: {fileID: 919132149155446097, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
       propertyPath: m_Name
       value: wallDoorway (7)
@@ -3042,6 +3062,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: -6867524174320841699, guid: 5d8899396fe9e4d42b8ef2f3a137ab0e, type: 3}
     - target: {fileID: 919132149155446097, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
       propertyPath: m_Name
       value: wallDoorway (2)
@@ -3112,6 +3136,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: -6867524174320841699, guid: 1348932f0302bf74085b9729e84a8331, type: 3}
     - target: {fileID: 919132149155446097, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
       propertyPath: m_Name
       value: wallDoorway
@@ -3182,6 +3210,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: -6867524174320841699, guid: 5d8899396fe9e4d42b8ef2f3a137ab0e, type: 3}
     - target: {fileID: 919132149155446097, guid: b77518a5a475b5e4b871bcc79aaf14e1, type: 3}
       propertyPath: m_Name
       value: wallDoorway (4)
