@@ -26,6 +26,13 @@ using UnityEngine.InputSystem;
 [AddComponentMenu("Events/Flood Event")]
 public class FloodEvent : MonoBehaviour
 {
+    [HideInInspector]
+    public bool controlledByDifficultyManager;
+
+    private void OnEnable()
+    {
+        DisasterDifficultyManager.Register(this);
+    }
 
     private void StartFloodAudio()
     {
@@ -76,7 +83,7 @@ public class FloodEvent : MonoBehaviour
     [Header("Activation")]
     [Tooltip("Start a flood automatically when the scene starts. Off by default: trigger it with F, or call StartFlood() from your own game mode.")]
 
-    
+
     public bool autoStart = false;
     public float delayBeforeFlood = 10f;
 
@@ -97,11 +104,20 @@ public class FloodEvent : MonoBehaviour
     [Tooltip("Extra speed gained every second while rising. 0 = constant speed.")]
     public float riseAcceleration = 0.15f;
 
-    [Tooltip("How long the water stays at its peak before draining.")]
-    public float peakHoldDuration = 8f;
+    [Tooltip("How long the water stays at its peak before draining. Fixed on purpose: the difficulty manager does not change it.")]
+    public float peakHoldDuration = 3f;
 
     [Tooltip("How fast the water drains, in units per second.")]
     public float drainSpeed = 1f;
+
+    [Header("Difficulty Scaling")]
+    [Tooltip("Water speed at difficulty 0 / 1.")]
+    public float riseSpeedAtDifficulty0 = 0.35f;
+    public float riseSpeedAtDifficulty1 = 0.9f;
+
+    [Tooltip("How far above the floor the water climbs, at difficulty 0 / 1.")]
+    public float waterRiseAtDifficulty0 = 2.2f;
+    public float waterRiseAtDifficulty1 = 3.2f;
 
     [Header("Water Height")]
     [Tooltip("How far above the floor the water rises. This is your height knob.")]
@@ -160,6 +176,15 @@ public class FloodEvent : MonoBehaviour
     [Header("Drowning")]
     public bool drownPlayer = true;
 
+    [Header("Oxygen Tank Upgrade")]
+    [Tooltip("Maximum oxygen while the permanent O2 Tank upgrade is owned.")]
+    public float oxygenCapacity = 20f;
+    [Tooltip("Oxygen consumed per second while the player's head is underwater.")]
+    public float oxygenDrainPerSecond = 1f;
+    [Tooltip("Oxygen restored per second while the player's head is above water.")]
+    public float oxygenRefillPerSecond = 2f;
+    private float currentOxygen;
+
     [Tooltip("How far above the camera the top of the head is.")]
     public float headHeightAboveCamera = 0.12f;
 
@@ -171,7 +196,7 @@ public class FloodEvent : MonoBehaviour
     public float underwaterFogDensity = 0.08f;
 
     [Header("Diagnostics")]
-    public bool showDebugHud = true;
+    public bool showDebugHud = false;
 
     // Read-only state -------------------------------------------------------
 
@@ -225,6 +250,7 @@ public class FloodEvent : MonoBehaviour
     private void Awake()
     {
         ResolveReferences();
+        currentOxygen = oxygenCapacity;
         SaveFogSettings();
         BuildWaterMaterial();
         MeasureScene();
@@ -275,6 +301,24 @@ public class FloodEvent : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Starts a flood immediately, in the same frame, instead of asking the
+    /// flood loop to pick it up on its next tick. Use this when something
+    /// outside needs to know the flood has actually begun (the difficulty
+    /// manager does: StartFlood() leaves the state Idle until the next frame).
+    /// </summary>
+    public bool BeginFloodNow()
+    {
+        if (PlayerLost || State != FloodState.Idle)
+            return false;
+
+        // RunFlood runs up to its first yield straight away, so State is
+        // already Rising by the time this returns.
+        manualRequest = false;
+        StartCoroutine(RunFlood());
+        return true;
+    }
+
     /// <summary>Ends the current flood and puts the water back.</summary>
     public void CancelFlood()
     {
@@ -286,6 +330,29 @@ public class FloodEvent : MonoBehaviour
             ApplyWater();
             UpdateUnderwaterEffects();
         }
+    }
+
+    /// <summary>
+    /// Sets the flood's values from one 0..1 difficulty. 0 is the gentler end
+    /// of each pair, 1 the harsher end. The difficulty manager calls this
+    /// right before it starts a flood.
+    /// </summary>
+    public void ApplyDifficulty(float difficulty)
+    {
+        float t = Mathf.Clamp01(difficulty);
+
+        riseSpeed = Mathf.Lerp(
+            riseSpeedAtDifficulty0,
+            riseSpeedAtDifficulty1,
+            t);
+
+        waterRise = Mathf.Lerp(
+            waterRiseAtDifficulty0,
+            waterRiseAtDifficulty1,
+            t);
+
+        // peakHoldDuration is deliberately left alone: the water always sits
+        // at its peak for the same few seconds.
     }
 
     /// <summary>Re-measures the peak height. Returns the resulting peak level.</summary>
@@ -920,15 +987,27 @@ public class FloodEvent : MonoBehaviour
             return;
 
         float baseLevel = FloorLevel + waterLevelOffset;
+        float headTop = playerCamera.transform.position.y + headHeightAboveCamera;
+        bool waterExists = WaterLevel > baseLevel + 0.05f;
+        bool headUnderwater = waterExists && WaterLevel >= headTop;
 
-        if (WaterLevel <= baseLevel + 0.05f)
-            return;
-
-        float headTop = playerCamera.transform.position.y +
-            headHeightAboveCamera;
-
-        if (WaterLevel >= headTop)
+        if (GameProgress.HasOxygenTank)
+        {
+            if (headUnderwater)
+            {
+                currentOxygen = Mathf.Max(0f, currentOxygen - oxygenDrainPerSecond * Time.deltaTime);
+                if (currentOxygen <= 0f)
+                    EndEventAsLoss();
+            }
+            else
+            {
+                currentOxygen = Mathf.Min(oxygenCapacity, currentOxygen + oxygenRefillPerSecond * Time.deltaTime);
+            }
+        }
+        else if (headUnderwater)
+        {
             EndEventAsLoss();
+        }
     }
 
     private void EndEventAsLoss()
@@ -1044,18 +1123,13 @@ public class FloodEvent : MonoBehaviour
 
     private void OnGUI()
     {
-        if (PlayerLost)
+        if (GameProgress.HasOxygenTank && !PlayerLost)
         {
-            GUIStyle style = new GUIStyle();
-            style.alignment = TextAnchor.MiddleCenter;
-            style.fontSize = 48;
-            style.fontStyle = FontStyle.Bold;
-            style.normal.textColor = new Color(0.35f, 0.75f, 1f);
-
-            GUI.Label(
-                new Rect(0, 0, Screen.width, Screen.height),
-                "YOU DROWNED",
-                style);
+            float ratio = oxygenCapacity > 0f ? currentOxygen / oxygenCapacity : 0f;
+            GUI.Box(new Rect(20f, Screen.height - 55f, 224f, 30f), GUIContent.none);
+            GUI.Box(new Rect(25f, Screen.height - 50f, 214f * Mathf.Clamp01(ratio), 20f), GUIContent.none);
+            GUIStyle oxygenLabel = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };
+            GUI.Label(new Rect(25f, Screen.height - 75f, 220f, 22f), "OXYGEN " + Mathf.CeilToInt(currentOxygen) + "s", oxygenLabel);
         }
 
         if (!showDebugHud || PlayerLost)

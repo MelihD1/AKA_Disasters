@@ -3,6 +3,13 @@ using UnityEngine;
 
 public class TornadoEvent : MonoBehaviour
 {
+    [HideInInspector]
+    public bool controlledByDifficultyManager;
+    private void OnEnable()
+    {
+        DisasterDifficultyManager.Register(this);
+    }
+
     [Header("Tornado Schedule")]
     [Tooltip("Delay in seconds before the first tornado starts.")]
     [SerializeField] private float firstStartDelay = 30f;
@@ -32,6 +39,15 @@ public class TornadoEvent : MonoBehaviour
     [Tooltip("Sound that loops for the entire time the tornado is active.")]
     [SerializeField] private AudioClip tornadoLoopSound;
 
+    [Header("Difficulty Scaling")]
+    [Tooltip("Tornado length at difficulty 0 / 1.")]
+    [SerializeField] private float durationAtDifficulty0 = 10f;
+    [SerializeField] private float durationAtDifficulty1 = 22f;
+
+    [Tooltip("Movement speed multiplier at difficulty 0 / 1. Lower slows the player more.")]
+    [Range(0.05f, 1f)] [SerializeField] private float slowdownAtDifficulty0 = 0.7f;
+    [Range(0.05f, 1f)] [SerializeField] private float slowdownAtDifficulty1 = 0.35f;
+
     [Header("Debug")]
     [SerializeField] private bool showDebugMessages = true;
 
@@ -40,10 +56,14 @@ public class TornadoEvent : MonoBehaviour
 
     public bool TornadoActive => tornadoActive;
 
+    /// <summary>Movement multiplier the tornado is currently applying.</summary>
+    public float MovementSpeedMultiplier => movementSpeedMultiplier;
+
     private void Start()
     {
         FindPlayer();
-        StartCoroutine(TornadoRoutine());
+        if (!controlledByDifficultyManager)
+            StartCoroutine(TornadoRoutine());
     }
 
     private IEnumerator TornadoRoutine()
@@ -85,6 +105,52 @@ public class TornadoEvent : MonoBehaviour
         }
     }
 
+
+    public bool StartTornadoNow()
+    {
+        if (tornadoActive)
+            return false;
+
+        FindPlayer();
+        StartTornado();
+        return true;
+    }
+
+    public void StopTornadoNow()
+    {
+        if (tornadoActive)
+            EndTornado();
+    }
+
+    /// <summary>How long a tornado lasts at the current settings.</summary>
+    public float TornadoDuration =>
+        Mathf.Max(1f, (minimumDuration + maximumDuration) * 0.5f);
+
+    /// <summary>
+    /// Sets the tornado's values from one 0..1 difficulty. 0 is the gentler
+    /// end of each pair, 1 the harsher end. The difficulty manager calls this
+    /// right before it starts a tornado.
+    /// </summary>
+    public void ApplyDifficulty(float difficulty)
+    {
+        float t = Mathf.Clamp01(difficulty);
+
+        float seconds = Mathf.Lerp(
+            durationAtDifficulty0,
+            durationAtDifficulty1,
+            t);
+
+        // The owner may drive the exact length itself; keep both ends of the
+        // random range on the scaled value so either way it agrees.
+        minimumDuration = seconds;
+        maximumDuration = seconds;
+
+        movementSpeedMultiplier = Mathf.Lerp(
+            slowdownAtDifficulty0,
+            slowdownAtDifficulty1,
+            t);
+    }
+
     private void FindPlayer()
     {
         if (playerMotor != null)
@@ -98,7 +164,13 @@ public class TornadoEvent : MonoBehaviour
         tornadoActive = true;
 
         if (playerMotor != null)
-            playerMotor.SetTornadoSlowdown(movementSpeedMultiplier);
+        {
+            // Crampons permanently reduce 60% of the tornado's slowdown.
+            float effectiveMultiplier = movementSpeedMultiplier;
+            if (GameProgress.HasCrampons)
+                effectiveMultiplier = Mathf.Lerp(movementSpeedMultiplier, 1f, 0.6f);
+            playerMotor.SetTornadoSlowdown(effectiveMultiplier);
+        }
 
         if (tornadoAudioSource != null && tornadoLoopSound != null)
         {

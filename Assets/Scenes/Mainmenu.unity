@@ -1682,6 +1682,9 @@ MonoBehaviour:
   settingsPanel: {fileID: 1143193421}
   volumeSlider: {fileID: 1027579115}
   volumeValue: {fileID: 1846993339}
+  hardHatPrice: 5
+  cramponsPrice: 5
+  oxygenTankPrice: 8
 --- !u!4 &940560074
 Transform:
   m_ObjectHideFlags: 0

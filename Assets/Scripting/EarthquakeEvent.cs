@@ -4,6 +4,81 @@ using UnityEngine;
 
 public class EarthquakeEvent : MonoBehaviour
 {
+    [HideInInspector] 
+    public bool controlledByDifficultyManager;
+    private void OnEnable()
+    {
+        DisasterDifficultyManager.Register(this);
+    }
+    public void StartEarthquakeNow()
+    {
+        if (PlayerLost || EarthquakeActive)
+            return;
+
+        EarthquakeActive = true;
+        elapsed = 0f;
+        nextDirectionChange = 0f;
+
+        driftVelocity = Vector3.zero;
+        targetDriftVelocity = Vector3.zero;
+        driftVelocityChange = Vector3.zero;
+
+        if (dustParticles != null)
+            dustParticles.Play();
+
+        if (earthquakeAudioSource != null && earthquakeStartSound != null)
+            earthquakeAudioSource.PlayOneShot(earthquakeStartSound);
+
+        if (deadlyPhaseAudioSource != null)
+        {
+            deadlyPhaseAudioSource.Stop();
+            deadlyPhaseAudioSource.loop = false;
+            deadlyPhaseAudioSource.clip = null;
+        }
+    }
+
+    /// <summary>
+    /// Ends the earthquake right now. Used by the difficulty manager when it
+    /// needs to clear the field (StopEverything).
+    /// </summary>
+    public void StopEarthquakeNow()
+    {
+        if (!EarthquakeActive)
+            return;
+
+        FinishEarthquakeCycle();
+    }
+
+    /// <summary>
+    /// Sets every value this event uses from one 0..1 difficulty: 0 is the
+    /// gentler end of each pair below, 1 the harsher end. The difficulty
+    /// manager calls this right before it starts an earthquake.
+    /// </summary>
+    public void ApplyDifficulty(float difficulty)
+    {
+        float t = Mathf.Clamp01(difficulty);
+
+        earthquakeDuration = Mathf.Lerp(
+            durationAtDifficulty0,
+            durationAtDifficulty1,
+            t);
+
+        extraSurvivalTime = Mathf.Lerp(
+            survivalTimeAtDifficulty0,
+            survivalTimeAtDifficulty1,
+            t);
+
+        maxDriftSpeed = Mathf.Lerp(
+            driftAtDifficulty0,
+            driftAtDifficulty1,
+            t);
+
+        cameraShakeAmount = Mathf.Lerp(
+            shakeAtDifficulty0,
+            shakeAtDifficulty1,
+            t);
+    }
+
     [Header("Objects")]
     public Transform playerRoot;
     public CharacterController playerController;
@@ -29,6 +104,8 @@ public class EarthquakeEvent : MonoBehaviour
     public float delayBeforeEarthquake = 10f;
     public float earthquakeDuration = 10f;
     public float extraSurvivalTime = 5f;
+    [Tooltip("Extra seconds before the exposed-player deadline when the permanent Hard Hat upgrade is owned.")]
+    public float hardHatExtraSeconds = 5f;
     public float pauseBetweenEarthquakes = 3f;
 
     [Header("Camera Shake")]
@@ -46,6 +123,23 @@ public class EarthquakeEvent : MonoBehaviour
 
     [Range(0f, 1f)]
     public float endingIntensity = 1f;
+
+    [Header("Difficulty Scaling")]
+    [Tooltip("How long the earthquake lasts at difficulty 0 / 1.")]
+    public float durationAtDifficulty0 = 6f;
+    public float durationAtDifficulty1 = 12f;
+
+    [Tooltip("Seconds a hidden player survives past the deadline, at difficulty 0 / 1.")]
+    public float survivalTimeAtDifficulty0 = 8f;
+    public float survivalTimeAtDifficulty1 = 3f;
+
+    [Tooltip("Drift push on the player at difficulty 0 / 1.")]
+    public float driftAtDifficulty0 = 6f;
+    public float driftAtDifficulty1 = 14f;
+
+    [Tooltip("Camera shake at difficulty 0 / 1.")]
+    public float shakeAtDifficulty0 = 0.05f;
+    public float shakeAtDifficulty1 = 0.18f;
 
     public bool IsHiding { get; private set; }
     public bool EarthquakeActive { get; private set; }
@@ -102,56 +196,67 @@ public class EarthquakeEvent : MonoBehaviour
 
         StopEarthquakeParticles();
 
-        StartCoroutine(EarthquakeLoop());
+        if (!controlledByDifficultyManager)
+            StartCoroutine(EarthquakeLoop());
     }
 
     private IEnumerator EarthquakeLoop()
     {
-        // Initial delay before the first earthquake.
-        yield return new WaitForSeconds(delayBeforeEarthquake);
+        if (!controlledByDifficultyManager)
+            yield return new WaitForSeconds(delayBeforeEarthquake);
 
         while (!PlayerLost)
         {
-            EarthquakeActive = true;
-            elapsed = 0f;
-            nextDirectionChange = 0f;
+            if (!controlledByDifficultyManager)
+                BeginEarthquakeCycle();
 
-            driftVelocity = Vector3.zero;
-            targetDriftVelocity = Vector3.zero;
-            driftVelocityChange = Vector3.zero;
-
-            // Dust starts when each earthquake begins.
-            if (dustParticles != null)
-                dustParticles.Play();
-
-            // Play the initial earthquake sound once.
-            if (earthquakeAudioSource != null && earthquakeStartSound != null)
-                earthquakeAudioSource.PlayOneShot(earthquakeStartSound);
-
-            // Reset the deadly-phase sound for this cycle.
-            if (deadlyPhaseAudioSource != null)
-            {
-                deadlyPhaseAudioSource.Stop();
-                deadlyPhaseAudioSource.loop = false;
-                deadlyPhaseAudioSource.clip = null;
-            }
-
-            // Wait for the event to finish or the player to lose.
             while (EarthquakeActive && !PlayerLost)
                 yield return null;
 
             if (PlayerLost)
                 yield break;
 
-            // Quiet interval between earthquakes.
-            RestoreCameraShake();
-
-            yield return new WaitForSeconds(
-                pauseBetweenEarthquakes
-            );
+            if (controlledByDifficultyManager)
+            {
+                // Wait for the difficulty manager to start the next event.
+                while (!EarthquakeActive && !PlayerLost)
+                    yield return null;
+            }
+            else
+            {
+                RestoreCameraShake();
+                yield return new WaitForSeconds(pauseBetweenEarthquakes);
+            }
         }
     }
 
+    private void BeginEarthquakeCycle()
+    {
+        if (PlayerLost || EarthquakeActive)
+            return;
+
+        EarthquakeActive = true;
+        elapsed = 0f;
+        nextDirectionChange = 0f;
+        driftVelocity = Vector3.zero;
+        targetDriftVelocity = Vector3.zero;
+        driftVelocityChange = Vector3.zero;
+
+        if (dustParticles != null)
+            dustParticles.Play();
+
+        if (earthquakeAudioSource != null && earthquakeStartSound != null)
+            earthquakeAudioSource.PlayOneShot(earthquakeStartSound);
+
+        if (deadlyPhaseAudioSource != null)
+        {
+            deadlyPhaseAudioSource.Stop();
+            deadlyPhaseAudioSource.loop = false;
+            deadlyPhaseAudioSource.clip = null;
+        }
+    }
+
+    
     private void Update()
     {
         if (!EarthquakeActive)
@@ -159,8 +264,10 @@ public class EarthquakeEvent : MonoBehaviour
 
         elapsed += Time.deltaTime;
 
+        float exposedDeadline = earthquakeDuration + (GameProgress.HasHardHat ? hardHatExtraSeconds : 0f);
+
         // Start rocks and the deadly-phase sound at the deadly phase.
-        if (elapsed >= earthquakeDuration)
+        if (elapsed >= exposedDeadline)
         {
             if (rockParticles != null && !rockParticles.isPlaying)
                 rockParticles.Play();
@@ -177,14 +284,14 @@ public class EarthquakeEvent : MonoBehaviour
         }
 
         // Exposed players lose at the original deadline.
-        if (elapsed >= earthquakeDuration && !IsHiding)
+        if (elapsed >= exposedDeadline && !IsHiding)
         {
             EndEventAsLoss();
             return;
         }
 
         // Hidden players survive the extended earthquake.
-        if (elapsed >= earthquakeDuration + extraSurvivalTime)
+        if (elapsed >= exposedDeadline + extraSurvivalTime)
         {
             if (IsHiding)
             {
@@ -203,7 +310,7 @@ public class EarthquakeEvent : MonoBehaviour
             return;
 
         float totalDuration =
-            earthquakeDuration + extraSurvivalTime;
+            earthquakeDuration + (GameProgress.HasHardHat ? hardHatExtraSeconds : 0f) + extraSurvivalTime;
 
         float progress = Mathf.Clamp01(
             elapsed / totalDuration
@@ -319,7 +426,8 @@ public class EarthquakeEvent : MonoBehaviour
         RestoreMovementScripts();
 
         // Leaving after the original deadline means losing.
-        if (EarthquakeActive && elapsed >= earthquakeDuration)
+        float exposedDeadline = earthquakeDuration + (GameProgress.HasHardHat ? hardHatExtraSeconds : 0f);
+        if (EarthquakeActive && elapsed >= exposedDeadline)
             EndEventAsLoss();
     }
 
@@ -414,19 +522,6 @@ public class EarthquakeEvent : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!PlayerLost)
-            return;
-
-        GUIStyle style = new GUIStyle();
-        style.alignment = TextAnchor.MiddleCenter;
-        style.fontSize = 48;
-        style.fontStyle = FontStyle.Bold;
-        style.normal.textColor = Color.red;
-
-        GUI.Label(
-            new Rect(0, 0, Screen.width, Screen.height),
-            "PLAYER LOST",
-            style
-        );
+        // GameOverManager owns the death screen UI.
     }
 }
