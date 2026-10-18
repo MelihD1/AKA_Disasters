@@ -156,6 +156,9 @@ MonoBehaviour:
   - {fileID: 7156717766503671303, guid: 6abda7669da86ef41a21bf8eb634b26a, type: 3}
   hallwayPool:
   - {fileID: 1972902357133707138, guid: f601419329ac4f046853da85d2998ca8, type: 3}
+  - {fileID: 6984603308839228578, guid: f7ecc16c649a1714bbcd993b7f3437db, type: 3}
+  - {fileID: 7015157836419353644, guid: 39356cd9a21903e48a35270cf446400b, type: 3}
+  - {fileID: 327404812537797772, guid: 3107f702b81eb5b459c6bf9b7e25ef55, type: 3}
   startingRoom: {fileID: 403955083971994462}
   hallwayBetweenRooms: 1
   keepBehind: 3
