@@ -15,5 +15,5 @@ MonoBehaviour:
   itemID: item_merged
   displayName: Emergency Bag
   itemType: 1
-  icon: {fileID: -5768448632506856880, guid: 11f7435cbb5e672438e8c53801e956b4, type: 3}
+  icon: {fileID: 9117617533685781156, guid: 19e68e069eefbc94083c25552b12a94e, type: 3}
   worldPrefab: {fileID: 0}
