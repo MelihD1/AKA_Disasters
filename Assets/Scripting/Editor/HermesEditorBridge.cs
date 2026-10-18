@@ -167,6 +167,23 @@ public static class HermesEditorBridge
             case "deathtest":
                 return StartDeathTest();
 
+            case "roomsetup":
+                return "OK roomsetup\n" + RoomStreamerSetup.SetupActiveScene();
+
+            case "rooms":
+                return "OK rooms\n" + RoomStreamerSetup.ReportStreamer();
+
+            case "roomtest":
+                return StartRoomTest();
+
+            case "prefabcheck":
+                return "OK prefabcheck\n" + PrefabScaleFixer.Measure(
+                    JoinArgs(parts, HallPrefabPath));
+
+            case "prefabfix":
+                return "OK prefabfix\n" + PrefabScaleFixer.BakeRootScale(
+                    JoinArgs(parts, HallPrefabPath));
+
             case "probe":
                 return "OK probe\n" + Probe();
 
@@ -1002,6 +1019,62 @@ public static class HermesEditorBridge
         EditorApplication.isPlaying = true;
 
         return "OK deathtest: runner created, entering play mode\n" +
+            "report: " + reportPath;
+    }
+
+    private const string HallPrefabPath =
+        "Assets/Prefabs Melihs/Halls/Hall 1.prefab";
+
+    /// <summary>Joins the rest of a command line, so paths with spaces work.</summary>
+    private static string JoinArgs(string[] parts, string fallback)
+    {
+        if (parts.Length < 2)
+            return fallback;
+
+        string joined = string.Join(" ", parts, 1, parts.Length - 1).Trim();
+
+        return string.IsNullOrEmpty(joined) ? fallback : joined;
+    }
+
+    private static string StartRoomTest()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+
+        if (!scene.isLoaded)
+            return "ERROR: no loaded scene";
+
+        if (Object.FindFirstObjectByType<RoomStreamer>() == null)
+        {
+            return "ERROR: no RoomStreamer in the open scene " +
+                "(run the 'roomsetup' command first)";
+        }
+
+        GameObject runner = GameObject.Find("RoomTestRunner");
+
+        if (runner == null)
+            runner = new GameObject("RoomTestRunner");
+
+        RoomStreamTestRunner component =
+            runner.GetComponent<RoomStreamTestRunner>();
+
+        if (component == null)
+            component = runner.AddComponent<RoomStreamTestRunner>();
+
+        string reportPath = LibraryPath("hermes_room_test_report.txt");
+
+        if (File.Exists(reportPath))
+            File.Delete(reportPath);
+
+        if (File.Exists(reportPath + ".done"))
+            File.Delete(reportPath + ".done");
+
+        component.reportPath = reportPath;
+
+        EditorUtility.SetDirty(component);
+
+        EditorApplication.isPlaying = true;
+
+        return "OK roomtest: runner created, entering play mode\n" +
             "report: " + reportPath;
     }
 

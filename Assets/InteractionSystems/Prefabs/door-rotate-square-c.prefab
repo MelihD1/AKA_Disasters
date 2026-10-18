@@ -96,6 +96,12 @@ MonoBehaviour:
   openAngle: 90
   baseDuration: 0.8
   referenceWalkSpeed: 5
+  maxSpeedMultiplier: 3.5
+  minimumDuration: 0.12
+  approachDistance: 2.5
+  stopDistance: 1.2
+  movementThreshold: 0.08
+  rotationSmoothness: 12
   autoOpenOnApproach: 1
   autoCloseOnExit: 1
   audioSource: {fileID: 0}
