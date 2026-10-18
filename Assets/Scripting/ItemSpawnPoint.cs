@@ -57,6 +57,11 @@ public class ItemSpawnPoint : MonoBehaviour
         spawned = Instantiate(prefab, position, rotation);
         spawned.name = prefab.name + " (spawned)";
 
+        // Glow so the player can spot it across the room. Added here rather
+        // than in the prefab so the item prefabs stay untouched.
+        if (spawned.GetComponent<ItemGlow>() == null)
+            spawned.AddComponent<ItemGlow>();
+
         if (keepAsChild)
             spawned.transform.SetParent(transform, true);
 

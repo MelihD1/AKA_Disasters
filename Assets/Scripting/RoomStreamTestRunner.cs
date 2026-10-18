@@ -154,6 +154,31 @@ public class RoomStreamTestRunner : MonoBehaviour
 
         Log("spawn points: " + points.Length + ", filled: " + filled);
 
+        // Does the glow actually breathe?
+        ItemGlow glow = FindFirstObjectByType<ItemGlow>();
+
+        if (glow == null)
+        {
+            Log("no ItemGlow found on any spawned item");
+        }
+        else
+        {
+            Log("watching the glow on '" + glow.name + "' for two seconds:");
+
+            for (int i = 0; i < 8; i++)
+            {
+                yield return new WaitForSeconds(0.25f);
+
+                Light light = glow.GetComponent<Light>();
+
+                Log(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "   t={0:F2}s glow={1:F2} light={2:F2}",
+                    (i + 1) * 0.25f, glow.CurrentGlow,
+                    light != null ? light.intensity : -1f));
+            }
+        }
+
         Log("");
         Log("--- do the disaster sounds start? ---");
 

@@ -316,7 +316,7 @@ MonoBehaviour:
   cramponSlowdownReduction: 0.6
   tornadoAudioSource: {fileID: 184301505}
   audioFadeOut: 0.5
-  tornadoLoopSound: {fileID: 8300000, guid: f84a50d2c1dbf9246b38c823cc34b427, type: 3}
+  tornadoLoopSound: {fileID: 8300000, guid: 9da4e1e1dea75ad46b781bf01efa19d8, type: 3}
   durationAtDifficulty0: 10
   durationAtDifficulty1: 22
   slowdownAtDifficulty0: 0.75
@@ -3575,7 +3575,7 @@ MonoBehaviour:
   houseRoot: {fileID: 0}
   floodAudioSource: {fileID: 1277635039}
   audioFadeOut: 0.5
-  floodLoopSound: {fileID: 0}
+  floodLoopSound: {fileID: 8300000, guid: bf6f276f50b99fc4fa7e9fa53b1bfcc6, type: 3}
   autoStart: 0
   delayBeforeFlood: 10
   manualTriggerKey: 0

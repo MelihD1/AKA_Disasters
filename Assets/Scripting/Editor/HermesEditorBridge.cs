@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 /// <summary>
 /// Tiny file based command channel so an external tool (Hermes) can drive the
@@ -195,6 +197,18 @@ public static class HermesEditorBridge
 
             case "overlaptest":
                 return StartOverlapTest();
+
+            case "uidump":
+                return UiDump();
+
+            case "tutorialsetup":
+                return "OK tutorialsetup\n" + TutorialSetup.SetupActiveScene();
+
+            case "tutorialcheck":
+                return "OK tutorialcheck\n" + TutorialSetup.Check();
+
+            case "tutorialtest":
+                return StartTutorialTest();
 
             case "probe":
                 return "OK probe\n" + Probe();
@@ -1056,6 +1070,152 @@ public static class HermesEditorBridge
         string joined = string.Join(" ", parts, 1, parts.Length - 1).Trim();
 
         return string.IsNullOrEmpty(joined) ? fallback : joined;
+    }
+
+    private static string StartTutorialTest()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+
+        if (!scene.isLoaded)
+            return "ERROR: no loaded scene";
+
+        if (Object.FindFirstObjectByType<TutorialMenu>(
+            FindObjectsInactive.Include) == null)
+        {
+            return "ERROR: no TutorialMenu in the open scene";
+        }
+
+        GameObject runner = GameObject.Find("TutorialTestRunner");
+
+        if (runner == null)
+            runner = new GameObject("TutorialTestRunner");
+
+        TutorialTestRunner component =
+            runner.GetComponent<TutorialTestRunner>();
+
+        if (component == null)
+            component = runner.AddComponent<TutorialTestRunner>();
+
+        string reportPath = LibraryPath("hermes_tutorial_test_report.txt");
+
+        if (File.Exists(reportPath))
+            File.Delete(reportPath);
+
+        if (File.Exists(reportPath + ".done"))
+            File.Delete(reportPath + ".done");
+
+        component.reportPath = reportPath;
+
+        EditorUtility.SetDirty(component);
+
+        EditorApplication.isPlaying = true;
+
+        return "OK tutorialtest: runner created, entering play mode\n" +
+            "report: " + reportPath;
+    }
+
+    /// <summary>
+    /// Lists the UI in the open scene: canvases, every button with what it
+    /// calls, every text, and whether the tutorial scripts are present. Used to
+    /// wire menus up without guessing.
+    /// </summary>
+    private static string UiDump()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+        StringBuilder log = new StringBuilder();
+
+        log.AppendLine("scene: " + scene.path);
+
+        foreach (Canvas canvas in Object.FindObjectsByType<Canvas>(
+            FindObjectsInactive.Include))
+        {
+            log.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "canvas '{0}' renderMode={1} sortingOrder={2} active={3} scale={4}",
+                canvas.name, canvas.renderMode, canvas.sortingOrder,
+                canvas.gameObject.activeInHierarchy,
+                canvas.transform.localScale));
+        }
+
+        log.AppendLine("--- buttons ---");
+
+        foreach (Button button in Object.FindObjectsByType<Button>(
+            FindObjectsInactive.Include))
+        {
+            StringBuilder calls = new StringBuilder();
+
+            int count = button.onClick.GetPersistentEventCount();
+
+            for (int i = 0; i < count; i++)
+            {
+                Object target = button.onClick.GetPersistentTarget(i);
+
+                calls.Append(target != null ? target.GetType().Name : "null")
+                    .Append('.')
+                    .Append(button.onClick.GetPersistentMethodName(i))
+                    .Append(' ');
+            }
+
+            log.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "  '{0}' active={1} parent='{2}' onClick=[{3}]",
+                button.name, button.gameObject.activeInHierarchy,
+                button.transform.parent != null
+                    ? button.transform.parent.name
+                    : "-",
+                calls.ToString().Trim()));
+        }
+
+        log.AppendLine("--- texts ---");
+
+        foreach (TMP_Text text in Object.FindObjectsByType<TMP_Text>(
+            FindObjectsInactive.Include))
+        {
+            string content = text.text != null && text.text.Length > 50
+                ? text.text.Substring(0, 50) + "..."
+                : text.text;
+
+            log.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "  '{0}' active={1} text=\"{2}\"",
+                text.name, text.gameObject.activeInHierarchy,
+                content != null ? content.Replace("\n", " / ") : ""));
+        }
+
+        log.AppendLine("--- scripts ---");
+
+        TutorialMenu tutorial = Object.FindFirstObjectByType<TutorialMenu>(
+            FindObjectsInactive.Include);
+
+        log.AppendLine("TutorialMenu: " + (tutorial != null
+            ? "on '" + tutorial.gameObject.name + "'"
+            : "NOT IN THIS SCENE"));
+
+        MainMenuManager menu = Object.FindFirstObjectByType<MainMenuManager>(
+            FindObjectsInactive.Include);
+
+        if (menu == null)
+        {
+            log.AppendLine("MainMenuManager: not in this scene");
+            return log.ToString();
+        }
+
+        SerializedObject menuObject = new SerializedObject(menu);
+
+        foreach (string field in new[]
+        {
+            "settingsPanel", "volumeSlider", "volumeValue"
+        })
+        {
+            SerializedProperty property = menuObject.FindProperty(field);
+
+            log.AppendLine("MainMenuManager." + field + " = " +
+                (property != null && property.objectReferenceValue != null
+                    ? property.objectReferenceValue.name
+                    : "NONE"));
+        }
+
+        return log.ToString();
     }
 
     private static string StartOverlapTest()
