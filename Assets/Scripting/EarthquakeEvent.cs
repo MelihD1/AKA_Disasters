@@ -13,6 +13,15 @@ public class EarthquakeEvent : MonoBehaviour
     public ParticleSystem dustParticles;
     public ParticleSystem rockParticles;
 
+    [Header("Earthquake Audio")]
+    [Tooltip("Plays once when the earthquake begins.")]
+    public AudioSource earthquakeAudioSource;
+    public AudioClip earthquakeStartSound;
+
+    [Tooltip("Separate source so this sound can overlap the start sound.")]
+    public AudioSource deadlyPhaseAudioSource;
+    public AudioClip deadlyPhaseSound;
+
     [Header("Existing Movement Scripts")]
     public Behaviour[] movementScriptsToDisable;
 
@@ -115,6 +124,18 @@ public class EarthquakeEvent : MonoBehaviour
             if (dustParticles != null)
                 dustParticles.Play();
 
+            // Play the initial earthquake sound once.
+            if (earthquakeAudioSource != null && earthquakeStartSound != null)
+                earthquakeAudioSource.PlayOneShot(earthquakeStartSound);
+
+            // Reset the deadly-phase sound for this cycle.
+            if (deadlyPhaseAudioSource != null)
+            {
+                deadlyPhaseAudioSource.Stop();
+                deadlyPhaseAudioSource.loop = false;
+                deadlyPhaseAudioSource.clip = null;
+            }
+
             // Wait for the event to finish or the player to lose.
             while (EarthquakeActive && !PlayerLost)
                 yield return null;
@@ -138,12 +159,21 @@ public class EarthquakeEvent : MonoBehaviour
 
         elapsed += Time.deltaTime;
 
-        // Start rocks at the deadly phase.
-        if (elapsed >= earthquakeDuration &&
-            rockParticles != null &&
-            !rockParticles.isPlaying)
+        // Start rocks and the deadly-phase sound at the deadly phase.
+        if (elapsed >= earthquakeDuration)
         {
-            rockParticles.Play();
+            if (rockParticles != null && !rockParticles.isPlaying)
+                rockParticles.Play();
+
+            // Use a separate AudioSource so this overlaps the first sound.
+            if (deadlyPhaseAudioSource != null &&
+                deadlyPhaseSound != null &&
+                !deadlyPhaseAudioSource.isPlaying)
+            {
+                deadlyPhaseAudioSource.clip = deadlyPhaseSound;
+                deadlyPhaseAudioSource.loop = true;
+                deadlyPhaseAudioSource.Play();
+            }
         }
 
         // Exposed players lose at the original deadline.
@@ -297,16 +327,14 @@ public class EarthquakeEvent : MonoBehaviour
     {
         EarthquakeActive = false;
 
+        StopEarthquakeAudio();
         StopEarthquakeParticles();
         RestoreCameraShake();
 
-        // Allow the player to move again after surviving.
-        if (IsHiding)
-        {
-            IsHiding = false;
-            currentHidingSpot = null;
-            RestoreMovementScripts();
-        }
+        // Do NOT automatically release a hidden player when the earthquake ends.
+        // Keep the hiding state and movement scripts disabled until the player
+        // presses E at the hiding spot to leave. This prevents the player from
+        // being released/clipped into the hiding object at the end of the event.
 
         driftVelocity = Vector3.zero;
         targetDriftVelocity = Vector3.zero;
@@ -318,6 +346,7 @@ public class EarthquakeEvent : MonoBehaviour
         EarthquakeActive = false;
         PlayerLost = true;
 
+        StopEarthquakeAudio();
         StopEarthquakeParticles();
         RestoreCameraShake();
 
@@ -326,6 +355,19 @@ public class EarthquakeEvent : MonoBehaviour
             IsHiding = false;
             currentHidingSpot = null;
             RestoreMovementScripts();
+        }
+    }
+
+    private void StopEarthquakeAudio()
+    {
+        if (earthquakeAudioSource != null)
+            earthquakeAudioSource.Stop();
+
+        if (deadlyPhaseAudioSource != null)
+        {
+            deadlyPhaseAudioSource.Stop();
+            deadlyPhaseAudioSource.loop = false;
+            deadlyPhaseAudioSource.clip = null;
         }
     }
 

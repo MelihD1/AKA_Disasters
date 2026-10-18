@@ -26,6 +26,27 @@ using UnityEngine.InputSystem;
 [AddComponentMenu("Events/Flood Event")]
 public class FloodEvent : MonoBehaviour
 {
+
+    private void StartFloodAudio()
+    {
+        if (floodAudioSource == null || floodLoopSound == null)
+            return;
+
+        floodAudioSource.Stop();
+        floodAudioSource.clip = floodLoopSound;
+        floodAudioSource.loop = true;
+        floodAudioSource.Play();
+    }
+
+    private void StopFloodAudio()
+    {
+        if (floodAudioSource == null)
+            return;
+
+        floodAudioSource.Stop();
+        floodAudioSource.loop = false;
+        floodAudioSource.clip = null;
+    }
     public enum FloodState
     {
         Idle,
@@ -47,8 +68,15 @@ public class FloodEvent : MonoBehaviour
     [Tooltip("Root of the house. Colliders under it are measured to find the floor and the furniture.")]
     public Transform houseRoot;
 
+    [Header("Flood Audio")]
+    [SerializeField] private AudioSource floodAudioSource;
+    [SerializeField] private AudioClip floodLoopSound;
+
+
     [Header("Activation")]
     [Tooltip("Start a flood automatically when the scene starts. Off by default: trigger it with F, or call StartFlood() from your own game mode.")]
+
+    
     public bool autoStart = false;
     public float delayBeforeFlood = 10f;
 
@@ -818,6 +846,8 @@ public class FloodEvent : MonoBehaviour
 
         State = FloodState.Rising;
 
+        StartFloodAudio();
+
         float speed = Mathf.Max(0.01f, riseSpeed);
 
         while (WaterLevel < peak && !PlayerLost && !cancelRequested)
@@ -863,6 +893,7 @@ public class FloodEvent : MonoBehaviour
         cancelRequested = false;
         State = FloodState.Idle;
         ApplyWater();
+        StopFloodAudio();
     }
 
     public bool FloodKeyPressed()
@@ -906,6 +937,8 @@ public class FloodEvent : MonoBehaviour
         State = FloodState.Idle;
 
         StopAllCoroutines();
+
+        StopFloodAudio();
 
         Debug.Log("FloodEvent: the player drowned.");
     }

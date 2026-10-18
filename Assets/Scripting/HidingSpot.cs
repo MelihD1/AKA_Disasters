@@ -10,6 +10,15 @@ public class HidingSpot : MonoBehaviour
     [Header("Interaction")]
     public float interactionDistance = 3f;
 
+    [Header("Hidden Camera")]
+    [SerializeField] private Transform hideCameraPoint;
+
+    private Transform playerCameraTransform;
+    private Transform cameraParent;
+    private Vector3 originalCameraLocalPosition;
+    private Quaternion originalCameraLocalRotation;
+    private bool cameraPositionSaved;
+
     [Header("Glow")]
     public Renderer[] glowRenderers;
     public Color glowColor = new Color(1f, 0.8f, 0.25f);
@@ -72,6 +81,39 @@ public class HidingSpot : MonoBehaviour
             Debug.LogError("HidingSpot: Assign Player Camera in EarthquakeManager.");
     }
 
+    private void MoveCameraToHidePoint(Transform cameraTransform)
+    {
+        if (hideCameraPoint == null || cameraTransform == null)
+            return;
+
+        playerCameraTransform = cameraTransform;
+        cameraParent = cameraTransform.parent;
+
+        originalCameraLocalPosition = cameraTransform.localPosition;
+        originalCameraLocalRotation = cameraTransform.localRotation;
+        cameraPositionSaved = true;
+
+        // Temporarily detach the camera so its position is independent
+        // of the player's camera rig.
+        cameraTransform.SetParent(null, true);
+        cameraTransform.SetPositionAndRotation(
+            hideCameraPoint.position,
+            hideCameraPoint.rotation
+        );
+    }
+
+    private void RestoreCameraPosition()
+    {
+        if (!cameraPositionSaved || playerCameraTransform == null)
+            return;
+
+        playerCameraTransform.SetParent(cameraParent, false);
+        playerCameraTransform.localPosition = originalCameraLocalPosition;
+        playerCameraTransform.localRotation = originalCameraLocalRotation;
+
+        cameraPositionSaved = false;
+    }
+
     private void Update()
     {
         if (earthquake == null || playerCamera == null)
@@ -87,10 +129,11 @@ public class HidingSpot : MonoBehaviour
 
         if (earthquake.IsHiding && playerIsInside)
         {
-            if (PressedE())
-            {
+            if(PressedE())
+{
                 earthquake.ExitHide(this);
                 playerIsInside = false;
+                RestoreCameraPosition();
             }
 
             SetGlow(false);
@@ -138,7 +181,10 @@ public class HidingSpot : MonoBehaviour
         if (isLookingAt && PressedE())
         {
             if (earthquake.TryEnterHide(this))
+            {
                 playerIsInside = true;
+                MoveCameraToHidePoint(playerCamera.transform);
+            }
         }
     }
 

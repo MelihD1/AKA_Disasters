@@ -11,6 +11,12 @@ public class PlayerMotor : MonoBehaviour
     [Header("References")]
     [SerializeField] private PlayerInputReader inputReader;
     [SerializeField] private Transform cameraOffset;
+    private float tornadoSpeedMultiplier = 1f;
+
+    public void SetTornadoSlowdown(float multiplier)
+    {
+        tornadoSpeedMultiplier = Mathf.Clamp(multiplier, 0.05f, 1f);
+    }
 
     [Header("Movement Speeds")]
     [SerializeField] private float walkSpeed = 6f;
@@ -235,7 +241,9 @@ public class PlayerMotor : MonoBehaviour
             );
         }
 
-        controller.Move(horizontalVelocity * Time.deltaTime);
+        controller.Move(
+            horizontalVelocity * tornadoSpeedMultiplier * Time.deltaTime
+        );
     }
 
     private void ApplyGravityAndJump(bool grounded)
