@@ -125,6 +125,28 @@ public static class HermesEditorBridge
             case "cleanup":
                 return Cleanup();
 
+            case "disasters":
+                return "OK disasters\n" +
+                    DisasterSceneSetup.SetupActiveScene();
+
+            case "wire":
+                return "OK wire\n" + DisasterSceneSetup.WireDisasters();
+
+            case "wiring":
+                return "OK wiring\n" + DisasterSceneSetup.CheckWiring();
+
+            case "disastertest":
+                return StartDisasterTest();
+
+            case "itemsetup":
+                return "OK itemsetup\n" + ItemSceneSetup.SetupActiveScene();
+
+            case "itemcheck":
+                return "OK itemcheck\n" + ItemSceneSetup.CheckWiring();
+
+            case "itemtest":
+                return StartItemTest();
+
             case "probe":
                 return "OK probe\n" + Probe();
 
@@ -162,7 +184,8 @@ public static class HermesEditorBridge
         text.AppendLine(string.Format(
             CultureInfo.InvariantCulture,
             "flood: state={0} lost={1} water={2:F3} peak={3:F3} " +
-            "floor={4:F3} furniture={5:F3} eye={6:F3} floods={7}",
+            "floor={4:F3} furniture={5:F3} eye={6:F3} floods={7} " +
+            "hold={8:F1}s rise={9:F2} speed={10:F2}",
             flood.State,
             flood.PlayerLost,
             flood.WaterLevel,
@@ -170,7 +193,10 @@ public static class HermesEditorBridge
             flood.FloorLevel,
             flood.StandableFurnitureTop,
             flood.EyeHeight,
-            flood.FloodsCompleted));
+            flood.FloodsCompleted,
+            flood.peakHoldDuration,
+            flood.waterRise,
+            flood.riseSpeed));
 
         text.AppendLine("objects: waterVolume=" +
             (flood.waterVolume != null ? flood.waterVolume.name : "null") +
@@ -211,6 +237,69 @@ public static class HermesEditorBridge
                 "camera: ({0:F2}, {1:F2}, {2:F2}) submersion={3:F3}",
                 p.x, p.y, p.z,
                 flood.SubmersionDepth));
+        }
+
+        DisasterDifficultyManager manager =
+            Object.FindFirstObjectByType<DisasterDifficultyManager>();
+
+        if (manager != null)
+        {
+            text.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "difficulty: {0:F3}  now={1}  next={2:F1}s  started={3}  " +
+                "running={4}  playerLost={5}",
+                manager.Difficulty,
+                manager.CurrentDisaster,
+                manager.SecondsUntilNext,
+                manager.DisastersStarted,
+                manager.Running,
+                manager.PlayerLost));
+        }
+        else
+        {
+            text.AppendLine("difficulty: no manager in the scene");
+        }
+
+        PlayerInventory inventory =
+            Object.FindFirstObjectByType<PlayerInventory>();
+
+        if (inventory == null)
+        {
+            text.AppendLine("inventory: none");
+        }
+        else
+        {
+            text.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "inventory: merged={0} recipe={1}",
+                inventory.MergedItemCount,
+                inventory.ActiveRecipe != null
+                    ? inventory.ActiveRecipe.name
+                    : "NONE"));
+
+            foreach (ItemData item in LoadAllItems())
+            {
+                text.AppendLine("   " + item.displayName + " (" +
+                    item.itemID + "): " + inventory.GetItemCount(item));
+            }
+        }
+
+        InventoryHUD hud = Object.FindFirstObjectByType<InventoryHUD>();
+
+        if (hud == null)
+        {
+            text.AppendLine("hud: none");
+        }
+        else
+        {
+            CanvasGroup group = hud.GetComponent<CanvasGroup>();
+
+            text.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "hud: {0} alpha={1:F2} blocksRaycasts={2}",
+                hud.gameObject.name,
+                group != null ? group.alpha : -1f,
+                group != null ? group.blocksRaycasts : false));
         }
 
         return text.ToString();
@@ -307,7 +396,117 @@ public static class HermesEditorBridge
         if (runner != null)
             Object.DestroyImmediate(runner);
 
+        GameObject disasterRunner = GameObject.Find("DisasterTestRunner");
+
+        if (disasterRunner != null)
+            Object.DestroyImmediate(disasterRunner);
+
+        GameObject itemRunner = GameObject.Find("ItemTestRunner");
+
+        if (itemRunner != null)
+            Object.DestroyImmediate(itemRunner);
+
         return "OK cleanup";
+    }
+
+    private static string StartDisasterTest()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+
+        if (!scene.isLoaded)
+            return "ERROR: no loaded scene";
+
+        DisasterDifficultyManager manager =
+            Object.FindFirstObjectByType<DisasterDifficultyManager>();
+
+        if (manager == null)
+            return "ERROR: no DisasterDifficultyManager in the open scene " +
+                "(run the 'disasters' command first)";
+
+        GameObject runner = GameObject.Find("DisasterTestRunner");
+
+        if (runner == null)
+            runner = new GameObject("DisasterTestRunner");
+
+        DisasterPlayTestRunner component =
+            runner.GetComponent<DisasterPlayTestRunner>();
+
+        if (component == null)
+            component = runner.AddComponent<DisasterPlayTestRunner>();
+
+        string reportPath = LibraryPath("hermes_disaster_test_report.txt");
+
+        if (File.Exists(reportPath))
+            File.Delete(reportPath);
+
+        if (File.Exists(reportPath + ".done"))
+            File.Delete(reportPath + ".done");
+
+        component.reportPath = reportPath;
+        component.testSeconds = 70f;
+
+        EditorUtility.SetDirty(component);
+
+        EditorApplication.isPlaying = true;
+
+        return "OK disastertest: runner created, entering play mode\n" +
+            "report: " + reportPath;
+    }
+
+    private static string StartItemTest()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+
+        if (!scene.isLoaded)
+            return "ERROR: no loaded scene";
+
+        if (Object.FindFirstObjectByType<PlayerInventory>() == null)
+            return "ERROR: no PlayerInventory in the open scene";
+
+        GameObject runner = GameObject.Find("ItemTestRunner");
+
+        if (runner == null)
+            runner = new GameObject("ItemTestRunner");
+
+        ItemPlayTestRunner component =
+            runner.GetComponent<ItemPlayTestRunner>();
+
+        if (component == null)
+            component = runner.AddComponent<ItemPlayTestRunner>();
+
+        string reportPath = LibraryPath("hermes_item_test_report.txt");
+
+        if (File.Exists(reportPath))
+            File.Delete(reportPath);
+
+        if (File.Exists(reportPath + ".done"))
+            File.Delete(reportPath + ".done");
+
+        component.reportPath = reportPath;
+
+        EditorUtility.SetDirty(component);
+
+        EditorApplication.isPlaying = true;
+
+        return "OK itemtest: runner created, entering play mode\n" +
+            "report: " + reportPath;
+    }
+
+    /// <summary>Every ItemData asset in the project.</summary>
+    private static List<ItemData> LoadAllItems()
+    {
+        List<ItemData> items = new List<ItemData>();
+
+        foreach (string guid in AssetDatabase.FindAssets("t:ItemData"))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            ItemData item = AssetDatabase.LoadAssetAtPath<ItemData>(path);
+
+            if (item != null)
+                items.Add(item);
+        }
+
+        return items;
     }
 
     /// <summary>
