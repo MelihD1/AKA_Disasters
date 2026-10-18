@@ -40,6 +40,9 @@ public class TornadoEvent : MonoBehaviour
     [Tooltip("Audio Source used to play the looping tornado sound.")]
     [SerializeField] private AudioSource tornadoAudioSource;
 
+    [Tooltip("Seconds the looped tornado sound takes to fade out when the tornado ends.")]
+    public float audioFadeOut = 0.5f;
+
     [Tooltip("Sound that loops for the entire time the tornado is active.")]
     [SerializeField] private AudioClip tornadoLoopSound;
 
@@ -224,9 +227,15 @@ public class TornadoEvent : MonoBehaviour
         if (tornadoAudioSource == null)
             return;
 
-        tornadoAudioSource.Stop();
-        tornadoAudioSource.loop = false;
-        tornadoAudioSource.clip = null;
+        // Fade instead of cutting dead.
+        if (tornadoAudioSource.isPlaying && isActiveAndEnabled)
+        {
+            StartCoroutine(DisasterAudioFade.FadeOutAndStop(
+                tornadoAudioSource, audioFadeOut));
+            return;
+        }
+
+        DisasterAudioFade.StopNow(tornadoAudioSource);
     }
 
     private void OnDisable()

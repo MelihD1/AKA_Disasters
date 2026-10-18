@@ -199,7 +199,8 @@ public static class RoomStreamerSetup
         return pieces;
     }
 
-    /// <summary>Matches names like "Room1.1.3 Done + Scan's edits".</summary>
+    /// <summary>Matches names like "Room1.1.3 Done + Scan's edits" or
+    /// "Room 4.1.0 Done + Scan's edits 1".</summary>
     private static bool IsScanEdit(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -207,7 +208,7 @@ public static class RoomStreamerSetup
 
         string lower = name.ToLowerInvariant();
 
-        return lower.Contains("scan") && lower.TrimEnd().EndsWith("edits");
+        return lower.Contains("scan") && lower.Contains("edits");
     }
 
     private static Room FindStartingRoom(StringBuilder log)

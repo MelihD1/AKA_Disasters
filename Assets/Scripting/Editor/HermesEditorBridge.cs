@@ -184,6 +184,18 @@ public static class HermesEditorBridge
                 return "OK prefabfix\n" + PrefabScaleFixer.BakeRootScale(
                     JoinArgs(parts, HallPrefabPath));
 
+            case "spawnsetup":
+                return "OK spawnsetup\n" + ItemSpawnPointSetup.ReplaceMarkers();
+
+            case "spawncheck":
+                return "OK spawncheck\n" + ItemSpawnPointSetup.CheckRooms();
+
+            case "audiosetup":
+                return "OK audiosetup\n" + DisasterAudioSetup.SetupActiveScene();
+
+            case "overlaptest":
+                return StartOverlapTest();
+
             case "probe":
                 return "OK probe\n" + Probe();
 
@@ -449,6 +461,16 @@ public static class HermesEditorBridge
 
         if (log.Length == 0)
             log.AppendLine("no test rigs in the scene");
+
+        // The hand-placed test items from wiring up the item system: the rooms
+        // now spawn their own, so these would just double up.
+        GameObject itemRoot = GameObject.Find("ItemPickups");
+
+        if (itemRoot != null)
+        {
+            log.AppendLine("removed ItemPickups (the rooms spawn items now)");
+            Object.DestroyImmediate(itemRoot);
+        }
 
         if (!scene.IsValid())
             return "OK cleanup";
@@ -1034,6 +1056,48 @@ public static class HermesEditorBridge
         string joined = string.Join(" ", parts, 1, parts.Length - 1).Trim();
 
         return string.IsNullOrEmpty(joined) ? fallback : joined;
+    }
+
+    private static string StartOverlapTest()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+
+        if (!scene.isLoaded)
+            return "ERROR: no loaded scene";
+
+        if (Object.FindFirstObjectByType<EarthquakeEvent>() == null ||
+            Object.FindFirstObjectByType<FloodEvent>() == null)
+        {
+            return "ERROR: the open scene needs both an earthquake and a flood";
+        }
+
+        GameObject runner = GameObject.Find("OverlapTestRunner");
+
+        if (runner == null)
+            runner = new GameObject("OverlapTestRunner");
+
+        DisasterOverlapTestRunner component =
+            runner.GetComponent<DisasterOverlapTestRunner>();
+
+        if (component == null)
+            component = runner.AddComponent<DisasterOverlapTestRunner>();
+
+        string reportPath = LibraryPath("hermes_overlap_test_report.txt");
+
+        if (File.Exists(reportPath))
+            File.Delete(reportPath);
+
+        if (File.Exists(reportPath + ".done"))
+            File.Delete(reportPath + ".done");
+
+        component.reportPath = reportPath;
+
+        EditorUtility.SetDirty(component);
+
+        EditorApplication.isPlaying = true;
+
+        return "OK overlaptest: runner created, entering play mode\n" +
+            "report: " + reportPath;
     }
 
     private static string StartRoomTest()

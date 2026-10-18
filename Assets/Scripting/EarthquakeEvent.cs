@@ -108,6 +108,9 @@ public class EarthquakeEvent : MonoBehaviour
     public float hardHatExtraSeconds = 5f;
     public float pauseBetweenEarthquakes = 3f;
 
+    [Tooltip("Seconds the looped disaster sound takes to fade out when the event ends.")]
+    public float audioFadeOut = 0.5f;
+
     [Header("Camera Shake")]
     public float cameraShakeAmount = 0.08f;
     public float shakeSpeed = 20f;
@@ -128,6 +131,9 @@ public class EarthquakeEvent : MonoBehaviour
     [Tooltip("How long the earthquake lasts at difficulty 0 / 1. This is the exposed player's death deadline, so it shrinks as the run goes on.")]
     public float durationAtDifficulty0 = 10f;
     public float durationAtDifficulty1 = 5f;
+
+    [Tooltip("When the player hides during the safe part of a quake, jump the timer straight to the deadly phase instead of making him wait out the safe seconds.")]
+    public bool skipToDeadlyPhaseWhenHiding = true;
 
     [Tooltip("Seconds a hidden player survives past the deadline, at difficulty 0 / 1.")]
     public float survivalTimeAtDifficulty0 = 8f;
@@ -406,6 +412,22 @@ public class EarthquakeEvent : MonoBehaviour
         currentHidingSpot = spot;
         IsHiding = true;
 
+        // He is safe now, so there is no point making him sit through the
+        // quiet part of the quake: jump the clock to the deadly phase and let
+        // it play out while he stays hidden.
+        if (skipToDeadlyPhaseWhenHiding && EarthquakeActive)
+        {
+            float deadline = ExposedDeadline;
+
+            if (elapsed < deadline)
+            {
+                elapsed = deadline;
+
+                Debug.Log("[Earthquake] player hid early, skipping to the " +
+                    "deadly phase");
+            }
+        }
+
         if (playerRoot != null)
         {
             hidingPosition = playerRoot.position;
@@ -478,15 +500,22 @@ public class EarthquakeEvent : MonoBehaviour
 
     private void StopEarthquakeAudio()
     {
+        // The start cue is a one-shot, so it just stops. The deadly-phase loop
+        // fades out instead of being cut dead.
         if (earthquakeAudioSource != null)
-            earthquakeAudioSource.Stop();
+            DisasterAudioFade.StopNow(earthquakeAudioSource);
 
-        if (deadlyPhaseAudioSource != null)
+        if (deadlyPhaseAudioSource == null)
+            return;
+
+        if (deadlyPhaseAudioSource.isPlaying && isActiveAndEnabled)
         {
-            deadlyPhaseAudioSource.Stop();
-            deadlyPhaseAudioSource.loop = false;
-            deadlyPhaseAudioSource.clip = null;
+            StartCoroutine(DisasterAudioFade.FadeOutAndStop(
+                deadlyPhaseAudioSource, audioFadeOut));
+            return;
         }
+
+        DisasterAudioFade.StopNow(deadlyPhaseAudioSource);
     }
 
     private void StopEarthquakeParticles()

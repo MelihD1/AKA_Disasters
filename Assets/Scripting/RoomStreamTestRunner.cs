@@ -117,9 +117,166 @@ public class RoomStreamTestRunner : MonoBehaviour
             LogState("step " + step, streamer);
         }
 
+        // ---- items the rooms placed, and whether the sounds start ----
+        Log("");
+        Log("--- items placed by the rooms ---");
+
+        WorldItemPickup[] pickups = FindObjectsByType<WorldItemPickup>(
+            FindObjectsInactive.Include);
+
+        Log("collectible items in the scene: " + pickups.Length);
+
+        foreach (WorldItemPickup pickup in pickups)
+        {
+            if (pickup == null)
+                continue;
+
+            Log(string.Format(
+                CultureInfo.InvariantCulture,
+                "   '{0}' at ({1:F1}, {2:F1}, {3:F1}) item={4}",
+                pickup.name,
+                pickup.transform.position.x,
+                pickup.transform.position.y,
+                pickup.transform.position.z,
+                pickup.Item != null ? pickup.Item.displayName : "NULL"));
+        }
+
+        ItemSpawnPoint[] points = FindObjectsByType<ItemSpawnPoint>(
+            FindObjectsInactive.Include);
+
+        int filled = 0;
+
+        foreach (ItemSpawnPoint point in points)
+        {
+            if (point != null && point.Spawned != null)
+                filled++;
+        }
+
+        Log("spawn points: " + points.Length + ", filled: " + filled);
+
+        Log("");
+        Log("--- do the disaster sounds start? ---");
+
+        EarthquakeEvent quake = FindFirstObjectByType<EarthquakeEvent>();
+        TornadoEvent tornado = FindFirstObjectByType<TornadoEvent>();
+        FloodEvent water = FindFirstObjectByType<FloodEvent>();
+
+        LogAudio("earthquake idle", quake);
+        LogAudio("tornado idle", tornado);
+        LogAudio("flood idle", water);
+
+        if (tornado != null)
+        {
+            tornado.StartTornadoNow();
+            yield return new WaitForSeconds(1f);
+            LogAudio("tornado running", tornado);
+            tornado.StopTornadoNow();
+        }
+
+        if (quake != null)
+        {
+            quake.StartEarthquakeNow();
+            yield return new WaitForSeconds(1f);
+            LogAudio("earthquake running", quake);
+            quake.StopEarthquakeNow();
+        }
+
+        if (water != null)
+        {
+            water.BeginFloodNow();
+            yield return new WaitForSeconds(1f);
+            LogAudio("flood running", water);
+        }
+
+        // ---- hiding should skip the quiet part of a quake ----
+        Log("");
+        Log("--- hiding during an earthquake ---");
+
+        if (water != null)
+        {
+            // Stop the water from the sound check so it cannot drown him here.
+            water.CancelFlood();
+            yield return new WaitForSeconds(1f);
+        }
+
+        if (quake != null)
+        {
+            yield return new WaitForSeconds(0.5f);
+
+            quake.StartEarthquakeNow();
+
+            float deadline = quake.ExposedDeadline;
+
+            Log(string.Format(
+                CultureInfo.InvariantCulture,
+                "quake started: exposed deadline {0:F1}s, quake active={1}",
+                deadline, quake.EarthquakeActive));
+
+            HidingSpot spot = FindFirstObjectByType<HidingSpot>();
+
+            if (spot == null)
+            {
+                Log("no HidingSpot in the scene, cannot test hiding.");
+            }
+            else
+            {
+                // Hide straight away, while the safe part is still running.
+                yield return new WaitForSeconds(0.3f);
+
+                bool hidden = quake.TryEnterHide(spot);
+
+                Log("hid immediately, TryEnterHide returned " + hidden +
+                    " (hiding=" + quake.IsHiding + ")");
+
+                float waited = 0f;
+
+                while (quake.EarthquakeActive && waited < 30f)
+                {
+                    yield return null;
+                    waited += Time.deltaTime;
+                }
+
+                Log(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "quake ended after {0:F1}s of hiding (it would have been " +
+                    "~{1:F1}s if the safe period had to play out), lost={2}",
+                    waited, deadline + 5f, quake.PlayerLost));
+            }
+        }
+
         Log("");
         Log("=== done ===");
         Finish();
+    }
+
+    /// <summary>Names every AudioSource on a disaster object and says if it is running.</summary>
+    private void LogAudio(string label, MonoBehaviour host)
+    {
+        if (host == null)
+        {
+            Log("  " + label + ": not in the scene");
+            return;
+        }
+
+        AudioSource[] sources = host.GetComponents<AudioSource>();
+
+        if (sources.Length == 0)
+        {
+            Log("  " + label + ": no AudioSource on '" + host.name + "'");
+            return;
+        }
+
+        foreach (AudioSource source in sources)
+        {
+            Log(string.Format(
+                CultureInfo.InvariantCulture,
+                "  {0}: clip={1} playing={2} loop={3} volume={4:F2}",
+                label,
+                source.clip != null ? source.clip.name : "NONE",
+                source.isPlaying,
+                source.loop,
+                source.volume));
+        }
     }
 
     private void LogState(string label, RoomStreamer streamer)

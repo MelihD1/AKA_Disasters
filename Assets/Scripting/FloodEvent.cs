@@ -50,9 +50,16 @@ public class FloodEvent : MonoBehaviour
         if (floodAudioSource == null)
             return;
 
-        floodAudioSource.Stop();
-        floodAudioSource.loop = false;
-        floodAudioSource.clip = null;
+        // Fade instead of cutting dead, so the end of a flood does not sound
+        // like the audio broke or like something else killed it.
+        if (floodAudioSource.isPlaying && isActiveAndEnabled)
+        {
+            StartCoroutine(DisasterAudioFade.FadeOutAndStop(
+                floodAudioSource, audioFadeOut));
+            return;
+        }
+
+        DisasterAudioFade.StopNow(floodAudioSource);
     }
     public enum FloodState
     {
@@ -77,6 +84,9 @@ public class FloodEvent : MonoBehaviour
 
     [Header("Flood Audio")]
     [SerializeField] private AudioSource floodAudioSource;
+
+    [Tooltip("Seconds the looped flood sound takes to fade out when the flood ends.")]
+    public float audioFadeOut = 0.5f;
     [SerializeField] private AudioClip floodLoopSound;
 
 
