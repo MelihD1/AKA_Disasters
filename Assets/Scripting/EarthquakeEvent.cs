@@ -125,9 +125,9 @@ public class EarthquakeEvent : MonoBehaviour
     public float endingIntensity = 1f;
 
     [Header("Difficulty Scaling")]
-    [Tooltip("How long the earthquake lasts at difficulty 0 / 1.")]
-    public float durationAtDifficulty0 = 6f;
-    public float durationAtDifficulty1 = 12f;
+    [Tooltip("How long the earthquake lasts at difficulty 0 / 1. This is the exposed player's death deadline, so it shrinks as the run goes on.")]
+    public float durationAtDifficulty0 = 10f;
+    public float durationAtDifficulty1 = 5f;
 
     [Tooltip("Seconds a hidden player survives past the deadline, at difficulty 0 / 1.")]
     public float survivalTimeAtDifficulty0 = 8f;
@@ -144,6 +144,16 @@ public class EarthquakeEvent : MonoBehaviour
     public bool IsHiding { get; private set; }
     public bool EarthquakeActive { get; private set; }
     public bool PlayerLost { get; private set; }
+
+    /// <summary>
+    /// Seconds an exposed player has before he loses. The Hard Hat upgrade
+    /// pushes this out by hardHatExtraSeconds.
+    /// </summary>
+    public float ExposedDeadline =>
+        earthquakeDuration + (GameProgress.HasHardHat ? hardHatExtraSeconds : 0f);
+
+    /// <summary>True while the Hard Hat is buying the player extra time.</summary>
+    public bool HardHatProtects => GameProgress.HasHardHat;
 
     private HidingSpot currentHidingSpot;
 
@@ -264,7 +274,7 @@ public class EarthquakeEvent : MonoBehaviour
 
         elapsed += Time.deltaTime;
 
-        float exposedDeadline = earthquakeDuration + (GameProgress.HasHardHat ? hardHatExtraSeconds : 0f);
+        float exposedDeadline = ExposedDeadline;
 
         // Start rocks and the deadly-phase sound at the deadly phase.
         if (elapsed >= exposedDeadline)
@@ -310,7 +320,7 @@ public class EarthquakeEvent : MonoBehaviour
             return;
 
         float totalDuration =
-            earthquakeDuration + (GameProgress.HasHardHat ? hardHatExtraSeconds : 0f) + extraSurvivalTime;
+            ExposedDeadline + extraSurvivalTime;
 
         float progress = Mathf.Clamp01(
             elapsed / totalDuration
@@ -426,7 +436,7 @@ public class EarthquakeEvent : MonoBehaviour
         RestoreMovementScripts();
 
         // Leaving after the original deadline means losing.
-        float exposedDeadline = earthquakeDuration + (GameProgress.HasHardHat ? hardHatExtraSeconds : 0f);
+        float exposedDeadline = ExposedDeadline;
         if (EarthquakeActive && elapsed >= exposedDeadline)
             EndEventAsLoss();
     }

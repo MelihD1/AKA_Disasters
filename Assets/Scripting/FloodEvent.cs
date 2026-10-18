@@ -178,12 +178,15 @@ public class FloodEvent : MonoBehaviour
 
     [Header("Oxygen Tank Upgrade")]
     [Tooltip("Maximum oxygen while the permanent O2 Tank upgrade is owned.")]
-    public float oxygenCapacity = 20f;
+    public float oxygenCapacity = 3f;
     [Tooltip("Oxygen consumed per second while the player's head is underwater.")]
     public float oxygenDrainPerSecond = 1f;
     [Tooltip("Oxygen restored per second while the player's head is above water.")]
     public float oxygenRefillPerSecond = 2f;
+    [Tooltip("The meter only pops up while the player is under water. This is how long it stays on screen after he surfaces, so the refill is visible. 0 = hide the moment he is out of the water.")]
+    public float oxygenHudLinger = 2f;
     private float currentOxygen;
+    private float oxygenHudTimer;
 
     [Tooltip("How far above the camera the top of the head is.")]
     public float headHeightAboveCamera = 0.12f;
@@ -212,6 +215,21 @@ public class FloodEvent : MonoBehaviour
     public string FloorColliderName { get; private set; } = "?";
     public string TallestStandableName { get; private set; } = "?";
     public int FloodsCompleted { get; private set; }
+
+    /// <summary>True while the player's head is under the water.</summary>
+    public bool HeadUnderwater { get; private set; }
+
+    /// <summary>True while the oxygen meter should be on screen.</summary>
+    public bool OxygenHudVisible { get; private set; }
+
+    /// <summary>
+    /// True when the O2 Tank upgrade is on, so being under water drains
+    /// oxygen instead of killing the player straight away.
+    /// </summary>
+    public bool OxygenProtects => drownPlayer && GameProgress.HasOxygenTank;
+
+    /// <summary>Seconds of oxygen left (only meaningful with the O2 Tank).</summary>
+    public float CurrentOxygen => currentOxygen;
 
     public Vector3 WaterFootprint { get; private set; } = new Vector3(12f, 0f, 12f);
     public Vector3 HouseCenter { get; private set; }
@@ -983,17 +1001,31 @@ public class FloodEvent : MonoBehaviour
 
     private void CheckDrowning()
     {
-        if (!drownPlayer || PlayerLost || playerCamera == null)
+        if (!drownPlayer || playerCamera == null)
             return;
 
         float baseLevel = FloorLevel + waterLevelOffset;
         float headTop = playerCamera.transform.position.y + headHeightAboveCamera;
         bool waterExists = WaterLevel > baseLevel + 0.05f;
-        bool headUnderwater = waterExists && WaterLevel >= headTop;
+
+        HeadUnderwater = waterExists && WaterLevel >= headTop;
+
+        if (HeadUnderwater)
+            oxygenHudTimer = Mathf.Max(0f, oxygenHudLinger);
+        else if (oxygenHudTimer > 0f)
+            oxygenHudTimer -= Time.deltaTime;
+
+        // The meter only pops up while the player is under water.
+        OxygenHudVisible = GameProgress.HasOxygenTank &&
+            !PlayerLost &&
+            (HeadUnderwater || oxygenHudTimer > 0f);
+
+        if (PlayerLost)
+            return;
 
         if (GameProgress.HasOxygenTank)
         {
-            if (headUnderwater)
+            if (HeadUnderwater)
             {
                 currentOxygen = Mathf.Max(0f, currentOxygen - oxygenDrainPerSecond * Time.deltaTime);
                 if (currentOxygen <= 0f)
@@ -1004,7 +1036,7 @@ public class FloodEvent : MonoBehaviour
                 currentOxygen = Mathf.Min(oxygenCapacity, currentOxygen + oxygenRefillPerSecond * Time.deltaTime);
             }
         }
-        else if (headUnderwater)
+        else if (HeadUnderwater)
         {
             EndEventAsLoss();
         }
@@ -1123,7 +1155,7 @@ public class FloodEvent : MonoBehaviour
 
     private void OnGUI()
     {
-        if (GameProgress.HasOxygenTank && !PlayerLost)
+        if (OxygenHudVisible)
         {
             float ratio = oxygenCapacity > 0f ? currentOxygen / oxygenCapacity : 0f;
             GUI.Box(new Rect(20f, Screen.height - 55f, 224f, 30f), GUIContent.none);

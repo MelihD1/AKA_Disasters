@@ -18,6 +18,12 @@ public class GameOverManager : MonoBehaviour
     private bool gameOverShown;
     private PlayerInventory inventory;
 
+    /// <summary>Kits earned in this run only - what the death screen reports.</summary>
+    private int kitsThisRun;
+
+    /// <summary>Kits saved this run, before they are banked into the total.</summary>
+    public int KitsThisRun => kitsThisRun;
+
     private GUIStyle panelStyle;
     private GUIStyle titleStyle;
     private GUIStyle infoStyle;
@@ -55,10 +61,13 @@ public class GameOverManager : MonoBehaviour
         int kitsEarned =
             inventory != null ? inventory.MergedItemCount : 0;
 
+        // Only this run's kits count for the death screen.
+        kitsThisRun = kitsEarned;
+
         GameProgress.AddCurrency(kitsEarned);
 
         Debug.Log(
-            $"Run ended. Banked {kitsEarned} kits. " +
+            $"Run ended. Banked {kitsEarned} kits this run. " +
             $"Total: {GameProgress.Currency}");
 
         // Stop gameplay and release the mouse.
@@ -179,7 +188,7 @@ public class GameOverManager : MonoBehaviour
 
         GUI.Label(
             new Rect(x + 20f, y + 115f, panelW - 40f, 45f),
-            "Emergency kits saved: " + GameProgress.Currency,
+            "Emergency kits saved this run: " + kitsThisRun,
             infoStyle);
 
         if (GUI.Button(

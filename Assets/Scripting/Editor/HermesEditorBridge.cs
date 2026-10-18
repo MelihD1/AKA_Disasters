@@ -6,6 +6,8 @@ using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -102,6 +104,18 @@ public static class HermesEditorBridge
             case "ping":
                 return "OK ping";
 
+            case "openscene":
+                return OpenScene(parts.Length > 1 ? parts[1] : "");
+
+            case "tune":
+                return Tune();
+
+            case "lights":
+                return Lights();
+
+            case "prefs":
+                return Prefs(parts);
+
             case "report":
                 return "OK report\n" + SceneReport();
 
@@ -147,6 +161,12 @@ public static class HermesEditorBridge
             case "itemtest":
                 return StartItemTest();
 
+            case "upgradetest":
+                return StartUpgradeTest();
+
+            case "deathtest":
+                return StartDeathTest();
+
             case "probe":
                 return "OK probe\n" + Probe();
 
@@ -185,7 +205,8 @@ public static class HermesEditorBridge
             CultureInfo.InvariantCulture,
             "flood: state={0} lost={1} water={2:F3} peak={3:F3} " +
             "floor={4:F3} furniture={5:F3} eye={6:F3} floods={7} " +
-            "hold={8:F1}s rise={9:F2} speed={10:F2}",
+            "hold={8:F1}s rise={9:F2} speed={10:F2} " +
+            "o2={11:F1}s drain={12:F1}/s",
             flood.State,
             flood.PlayerLost,
             flood.WaterLevel,
@@ -196,7 +217,9 @@ public static class HermesEditorBridge
             flood.FloodsCompleted,
             flood.peakHoldDuration,
             flood.waterRise,
-            flood.riseSpeed));
+            flood.riseSpeed,
+            flood.oxygenCapacity,
+            flood.oxygenDrainPerSecond));
 
         text.AppendLine("objects: waterVolume=" +
             (flood.waterVolume != null ? flood.waterVolume.name : "null") +
@@ -391,22 +414,34 @@ public static class HermesEditorBridge
 
     private static string Cleanup()
     {
-        GameObject runner = GameObject.Find("FloodTestRunner");
+        Scene scene = SceneManager.GetActiveScene();
+        StringBuilder log = new StringBuilder();
 
-        if (runner != null)
-            Object.DestroyImmediate(runner);
+        // Sweep out every Hermes test rig, including any that got saved into
+        // the scene by accident (a rig left in the scene runs on play and
+        // starts disasters on its own).
+        foreach (GameObject candidate in SceneManager.GetActiveScene()
+            .GetRootGameObjects())
+        {
+            if (candidate == null || !candidate.name.EndsWith("TestRunner"))
+                continue;
 
-        GameObject disasterRunner = GameObject.Find("DisasterTestRunner");
+            log.AppendLine("removed " + candidate.name);
+            Object.DestroyImmediate(candidate);
+        }
 
-        if (disasterRunner != null)
-            Object.DestroyImmediate(disasterRunner);
+        if (log.Length == 0)
+            log.AppendLine("no test rigs in the scene");
 
-        GameObject itemRunner = GameObject.Find("ItemTestRunner");
+        if (!scene.IsValid())
+            return "OK cleanup";
 
-        if (itemRunner != null)
-            Object.DestroyImmediate(itemRunner);
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
+        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
 
-        return "OK cleanup";
+        log.AppendLine("saved: " + scene.path);
+
+        return "OK cleanup\n" + log.ToString();
     }
 
     private static string StartDisasterTest()
@@ -489,6 +524,484 @@ public static class HermesEditorBridge
         EditorApplication.isPlaying = true;
 
         return "OK itemtest: runner created, entering play mode\n" +
+            "report: " + reportPath;
+    }
+
+    /// <summary>
+    /// Shop state helper: reports it, snapshots it, restores it, or sets it.
+    /// Used to put a player's real unlocks back after a test run.
+    /// </summary>
+    private const string PrefCurrencyKey = "EmergencyKitsCurrency";
+
+    private static readonly string[] PrefUpgradeKeys =
+    {
+        "Upgrade_HardHat",
+        "Upgrade_Crampons",
+        "Upgrade_OxygenTank"
+    };
+
+    private const string PrefSnapshotFile = "hermes_pref_snapshot.txt";
+
+    private static string Prefs(string[] parts)
+    {
+        string action = parts.Length > 1 ? parts[1].ToLowerInvariant() : "report";
+        StringBuilder log = new StringBuilder();
+
+        string path = LibraryPath(PrefSnapshotFile);
+
+        if (action == "snapshot")
+        {
+            File.WriteAllText(path, SnapshotText());
+            log.AppendLine("snapshot written to " + path);
+        }
+        else if (action == "restore")
+        {
+            if (!File.Exists(path))
+                return "ERROR: no snapshot at " + path;
+
+            string[] values = File.ReadAllText(path)
+                .Trim()
+                .Split(' ');
+
+            if (values.Length < 1 + PrefUpgradeKeys.Length)
+                return "ERROR: bad snapshot: " + File.ReadAllText(path);
+
+            SetPrefs(values);
+            log.AppendLine("shop state restored from " + path);
+        }
+        else if (action == "set")
+        {
+            if (parts.Length < 2 + 1 + PrefUpgradeKeys.Length)
+                return "ERROR: prefs set <currency> <hardHat> <crampons> <oxygenTank>";
+
+            SetPrefs(parts, 2);
+            log.AppendLine("shop state set");
+        }
+
+        log.AppendLine("currency=" + GameProgress.Currency +
+            " hardHat=" + GameProgress.HasHardHat +
+            " crampons=" + GameProgress.HasCrampons +
+            " oxygenTank=" + GameProgress.HasOxygenTank);
+
+        return log.ToString();
+    }
+
+    private static string SnapshotText()
+    {
+        StringBuilder text = new StringBuilder();
+
+        text.Append(PlayerPrefs.GetInt(PrefCurrencyKey, 0));
+
+        foreach (string key in PrefUpgradeKeys)
+            text.Append(" ").Append(PlayerPrefs.GetInt(key, 0));
+
+        return text.ToString();
+    }
+
+    private static void SetPrefs(string[] values, int offset = 0)
+    {
+        PlayerPrefs.SetInt(
+            PrefCurrencyKey,
+            int.Parse(values[offset], CultureInfo.InvariantCulture));
+
+        for (int i = 0; i < PrefUpgradeKeys.Length; i++)
+        {
+            PlayerPrefs.SetInt(
+                PrefUpgradeKeys[i],
+                int.Parse(values[offset + 1 + i], CultureInfo.InvariantCulture));
+        }
+
+        PlayerPrefs.Save();
+    }
+
+    /// <summary>
+    /// Reports the lights in the open scene plus the shadow settings that
+    /// decide whether soft shadows can actually be rendered.
+    /// </summary>
+    private static string Lights()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+
+        if (!scene.IsValid() || !scene.isLoaded)
+            return "ERROR: no active scene";
+
+        StringBuilder log = new StringBuilder();
+
+        Light[] lights = Object.FindObjectsByType<Light>(
+            FindObjectsInactive.Include);
+
+        log.AppendLine("scene: " + scene.path);
+        log.AppendLine("lights in scene: " + lights.Length);
+
+        foreach (Light light in lights)
+        {
+            if (light == null)
+                continue;
+
+            Vector3 angles = light.transform.eulerAngles;
+
+            log.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "  '{0}' type={1} enabled={2} intensity={3:F2} " +
+                "color=({4:F2},{5:F2},{6:F2}) shadows={7} " +
+                "strength={8:F2} bake={9} angles=({10:F1},{11:F1},{12:F1})",
+                light.gameObject.name, light.type, light.enabled,
+                light.intensity, light.color.r, light.color.g, light.color.b,
+                light.shadows, light.shadowStrength, light.lightmapBakeType,
+                angles.x, angles.y, angles.z));
+        }
+
+        int level = QualitySettings.GetQualityLevel();
+
+        log.AppendLine(string.Format(
+            CultureInfo.InvariantCulture,
+            "quality level: {0} = '{1}' (of {2} levels)",
+            level, QualitySettings.names[level],
+            QualitySettings.names.Length - 1));
+
+        UniversalRenderPipelineAsset pipeline =
+            QualitySettings.renderPipeline as UniversalRenderPipelineAsset;
+
+        if (pipeline == null)
+        {
+            pipeline = GraphicsSettings.defaultRenderPipeline
+                as UniversalRenderPipelineAsset;
+        }
+
+        if (pipeline == null)
+        {
+            log.AppendLine("render pipeline: not URP");
+            return log.ToString();
+        }
+
+        log.AppendLine("URP asset: " + pipeline.name);
+        log.AppendLine("  main light shadows supported: " +
+            pipeline.supportsMainLightShadows);
+        log.AppendLine("  soft shadows supported: " +
+            pipeline.supportsSoftShadows);
+        log.AppendLine("  shadow distance: " +
+            pipeline.shadowDistance + "m");
+        log.AppendLine("  cascade count: " +
+            pipeline.shadowCascadeCount);
+        log.AppendLine("  main light shadowmap: " +
+            pipeline.mainLightShadowmapResolution);
+        log.AppendLine("  additional light shadows: " +
+            pipeline.supportsAdditionalLightShadows);
+
+        return log.ToString();
+    }
+
+    /// <summary>
+    /// Pushes the current balance numbers into the open scene. A scene stores
+    /// its own copy of every serialized field, so changing a script default
+    /// alone does not change a scene that has already been built.
+    /// </summary>
+    private static string Tune()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+
+        if (!scene.IsValid() || !scene.isLoaded)
+            return "ERROR: no active scene";
+
+        StringBuilder log = new StringBuilder();
+
+        FloodEvent flood = Object.FindFirstObjectByType<FloodEvent>();
+        EarthquakeEvent quake = Object.FindFirstObjectByType<EarthquakeEvent>();
+        TornadoEvent tornado = Object.FindFirstObjectByType<TornadoEvent>();
+
+        if (flood != null)
+        {
+            log.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "flood.oxygenCapacity: {0:0.0}s -> 3.0s",
+                flood.oxygenCapacity));
+
+            flood.oxygenCapacity = 3f;
+            EditorUtility.SetDirty(flood);
+        }
+
+        if (quake != null)
+        {
+            SerializedObject quakeObject = new SerializedObject(quake);
+
+            log.AppendLine(SetFloat(quakeObject,
+                "durationAtDifficulty0", 10f, "earthquake.deathDeadline@0"));
+            log.AppendLine(SetFloat(quakeObject,
+                "durationAtDifficulty1", 5f, "earthquake.deathDeadline@1"));
+
+            quakeObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(quake);
+        }
+
+        if (tornado != null)
+        {
+            SerializedObject tornadoObject = new SerializedObject(tornado);
+
+            log.AppendLine(SetFloat(tornadoObject,
+                "slowdownAtDifficulty0", 0.75f, "tornado.playerSpeed@0"));
+            log.AppendLine(SetFloat(tornadoObject,
+                "slowdownAtDifficulty1", 0.4f, "tornado.playerSpeed@1"));
+
+            tornadoObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(tornado);
+        }
+
+        log.AppendLine("--- read back from the components ---");
+
+        if (flood != null)
+        {
+            log.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "flood: oxygen {0:0.0}s, drain {1:0.0}/s",
+                flood.oxygenCapacity, flood.oxygenDrainPerSecond));
+        }
+
+        if (quake != null)
+        {
+            log.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "earthquake: death deadline {0:0.0}s at difficulty 0, " +
+                "{1:0.0}s at difficulty 1 (hard hat adds {2:0.0}s)",
+                quake.durationAtDifficulty0, quake.durationAtDifficulty1,
+                quake.hardHatExtraSeconds));
+        }
+
+        if (tornado != null)
+        {
+            SerializedObject tornadoObject = new SerializedObject(tornado);
+
+            SerializedProperty speed0 =
+                tornadoObject.FindProperty("slowdownAtDifficulty0");
+            SerializedProperty speed1 =
+                tornadoObject.FindProperty("slowdownAtDifficulty1");
+            SerializedProperty crampons =
+                tornadoObject.FindProperty("cramponSlowdownReduction");
+
+            log.AppendLine(string.Format(
+                CultureInfo.InvariantCulture,
+                "tornado: player keeps {0:0.00} of his speed at difficulty 0, " +
+                "{1:0.00} at difficulty 1 (crampons cancel {2:0}% of the loss)",
+                speed0 != null ? speed0.floatValue : -1f,
+                speed1 != null ? speed1.floatValue : -1f,
+                (crampons != null ? crampons.floatValue : 0f) * 100f));
+        }
+
+        InventoryHUD hud = Object.FindFirstObjectByType<InventoryHUD>();
+
+        if (hud != null)
+        {
+            SerializedObject hudObject = new SerializedObject(hud);
+            SerializedProperty hidden = hudObject.FindProperty("startHidden");
+
+            if (hidden != null)
+            {
+                log.AppendLine("hud.startHidden: " + hidden.boolValue +
+                    " -> False (always on screen)");
+
+                hidden.boolValue = false;
+                hudObject.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(hud);
+            }
+            else
+            {
+                log.AppendLine("hud.startHidden: property not found");
+            }
+
+            CanvasGroup group = hud.GetComponent<CanvasGroup>();
+
+            if (group != null)
+            {
+                if (group.alpha <= 0f)
+                {
+                    group.alpha = 1f;
+                    EditorUtility.SetDirty(group);
+                }
+
+                log.AppendLine("hud canvas alpha in the scene: " + group.alpha);
+            }
+        }
+        else
+        {
+            log.AppendLine("hud: not in this scene");
+        }
+
+        // The water volume is built at run time. Keep the saved scene tidy so
+        // it never looks like a flood is already running.
+        if (flood != null && flood.waterVolume != null)
+        {
+            Renderer water = flood.waterVolume.GetComponent<Renderer>();
+
+            if (water != null && water.enabled)
+            {
+                water.enabled = false;
+                EditorUtility.SetDirty(water);
+            }
+
+            Vector3 scale = flood.waterVolume.localScale;
+            flood.waterVolume.localScale = new Vector3(scale.x, 0f, scale.z);
+            EditorUtility.SetDirty(flood.waterVolume);
+
+            log.AppendLine("water volume hidden in the saved scene");
+        }
+
+        // Dev-only keys for testing the shop upgrades.
+        if (Object.FindFirstObjectByType<DevTestKeys>(FindObjectsInactive.Include) == null)
+        {
+            GameObject devKeys = new GameObject("DevTestKeys");
+            devKeys.AddComponent<DevTestKeys>();
+
+            log.AppendLine("added DevTestKeys: F5 kits, F6 upgrades on, " +
+                "F7 upgrades off, F8 shop state, 1/2/3 force disasters");
+        }
+        else
+        {
+            log.AppendLine("DevTestKeys already in the scene");
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        log.AppendLine("saved: " + scene.path);
+
+        return log.ToString();
+    }
+
+    private static string SetFloat(
+        SerializedObject target, string name, float value, string label)
+    {
+        SerializedProperty property = target.FindProperty(name);
+
+        if (property == null)
+            return label + ": PROPERTY NOT FOUND";
+
+        float before = property.floatValue;
+        property.floatValue = value;
+
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0}: {1:0.00} -> {2:0.00}",
+            label, before, value);
+    }
+
+    /// <summary>
+    /// Opens a scene for the tests. Refuses when the open scene has unsaved
+    /// changes so nobody's work is thrown away.
+    /// </summary>
+    private static string OpenScene(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            path = "Assets/Scenes/Gameplay.unity";
+
+        if (!path.EndsWith(".unity"))
+            path += ".unity";
+
+        if (EditorApplication.isPlaying)
+            return "REFUSED: in play mode, stop first";
+
+        Scene current = SceneManager.GetActiveScene();
+
+        if (current.path == path)
+            return "OK openscene: already open " + path;
+
+        if (current.isDirty)
+            return "REFUSED: " + current.path +
+                " has unsaved changes - save it first";
+
+        Scene opened = EditorSceneManager.OpenScene(
+            path, OpenSceneMode.Single);
+
+        return "OK openscene: " + opened.path + " (was " + current.path + ")";
+    }
+
+    private static string StartUpgradeTest()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+
+        if (!scene.isLoaded)
+            return "ERROR: no loaded scene";
+
+        if (Object.FindFirstObjectByType<EarthquakeEvent>() == null ||
+            Object.FindFirstObjectByType<TornadoEvent>() == null ||
+            Object.FindFirstObjectByType<FloodEvent>() == null)
+        {
+            return "ERROR: the open scene is missing a disaster script";
+        }
+
+        GameObject runner = GameObject.Find("UpgradeTestRunner");
+
+        if (runner == null)
+            runner = new GameObject("UpgradeTestRunner");
+
+        UpgradeEffectTestRunner component =
+            runner.GetComponent<UpgradeEffectTestRunner>();
+
+        if (component == null)
+            component = runner.AddComponent<UpgradeEffectTestRunner>();
+
+        string reportPath = LibraryPath("hermes_upgrade_test_report.txt");
+
+        if (File.Exists(reportPath))
+            File.Delete(reportPath);
+
+        if (File.Exists(reportPath + ".done"))
+            File.Delete(reportPath + ".done");
+
+        // Write down the player's real shop state first, in case the test
+        // ends with a death and never gets to put it back itself.
+        File.WriteAllText(LibraryPath(PrefSnapshotFile), SnapshotText());
+
+        component.reportPath = reportPath;
+
+        EditorUtility.SetDirty(component);
+
+        EditorApplication.isPlaying = true;
+
+        return "OK upgradetest: runner created, entering play mode\n" +
+            "report: " + reportPath;
+    }
+
+    private static string StartDeathTest()
+    {
+        Scene scene = SceneManager.GetActiveScene();
+
+        if (!scene.isLoaded)
+            return "ERROR: no loaded scene";
+
+        if (Object.FindFirstObjectByType<GameOverManager>() == null ||
+            Object.FindFirstObjectByType<PlayerInventory>() == null ||
+            Object.FindFirstObjectByType<FloodEvent>() == null)
+        {
+            return "ERROR: the open scene is missing a script the test needs";
+        }
+
+        GameObject runner = GameObject.Find("DeathTestRunner");
+
+        if (runner == null)
+            runner = new GameObject("DeathTestRunner");
+
+        DeathSummaryTestRunner component =
+            runner.GetComponent<DeathSummaryTestRunner>();
+
+        if (component == null)
+            component = runner.AddComponent<DeathSummaryTestRunner>();
+
+        string reportPath = LibraryPath("hermes_death_test_report.txt");
+
+        if (File.Exists(reportPath))
+            File.Delete(reportPath);
+
+        if (File.Exists(reportPath + ".done"))
+            File.Delete(reportPath + ".done");
+
+        // The death banks a kit, so write down the real shop state first.
+        File.WriteAllText(LibraryPath(PrefSnapshotFile), SnapshotText());
+
+        component.reportPath = reportPath;
+
+        EditorUtility.SetDirty(component);
+
+        EditorApplication.isPlaying = true;
+
+        return "OK deathtest: runner created, entering play mode\n" +
             "report: " + reportPath;
     }
 

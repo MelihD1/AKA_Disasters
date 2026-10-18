@@ -32,6 +32,10 @@ public class TornadoEvent : MonoBehaviour
     [Range(0.05f, 1f)]
     [SerializeField] private float movementSpeedMultiplier = 0.5f;
 
+    [Tooltip("How much of the tornado's slowdown the permanent Crampons upgrade cancels. 0.6 = the player keeps 60% of the slowdown removed.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float cramponSlowdownReduction = 0.6f;
+
     [Header("Tornado Audio")]
     [Tooltip("Audio Source used to play the looping tornado sound.")]
     [SerializeField] private AudioSource tornadoAudioSource;
@@ -45,8 +49,8 @@ public class TornadoEvent : MonoBehaviour
     [SerializeField] private float durationAtDifficulty1 = 22f;
 
     [Tooltip("Movement speed multiplier at difficulty 0 / 1. Lower slows the player more.")]
-    [Range(0.05f, 1f)] [SerializeField] private float slowdownAtDifficulty0 = 0.7f;
-    [Range(0.05f, 1f)] [SerializeField] private float slowdownAtDifficulty1 = 0.35f;
+    [Range(0.05f, 1f)] [SerializeField] private float slowdownAtDifficulty0 = 0.75f;
+    [Range(0.05f, 1f)] [SerializeField] private float slowdownAtDifficulty1 = 0.4f;
 
     [Header("Debug")]
     [SerializeField] private bool showDebugMessages = true;
@@ -58,6 +62,16 @@ public class TornadoEvent : MonoBehaviour
 
     /// <summary>Movement multiplier the tornado is currently applying.</summary>
     public float MovementSpeedMultiplier => movementSpeedMultiplier;
+
+    /// <summary>
+    /// The slowdown actually handed to the player. Lower than
+    /// MovementSpeedMultiplier once the Crampons upgrade is owned; 1 = not
+    /// slowed at all.
+    /// </summary>
+    public float AppliedSlowdown { get; private set; } = 1f;
+
+    /// <summary>True while the Crampons upgrade is weakening the tornado.</summary>
+    public bool CramponsProtect => GameProgress.HasCrampons;
 
     private void Start()
     {
@@ -165,11 +179,17 @@ public class TornadoEvent : MonoBehaviour
 
         if (playerMotor != null)
         {
-            // Crampons permanently reduce 60% of the tornado's slowdown.
+            // Crampons permanently reduce the tornado's slowdown.
             float effectiveMultiplier = movementSpeedMultiplier;
             if (GameProgress.HasCrampons)
-                effectiveMultiplier = Mathf.Lerp(movementSpeedMultiplier, 1f, 0.6f);
+                effectiveMultiplier = Mathf.Lerp(movementSpeedMultiplier, 1f, Mathf.Clamp01(cramponSlowdownReduction));
+
             playerMotor.SetTornadoSlowdown(effectiveMultiplier);
+            AppliedSlowdown = effectiveMultiplier;
+        }
+        else
+        {
+            AppliedSlowdown = 1f;
         }
 
         if (tornadoAudioSource != null && tornadoLoopSound != null)
@@ -190,6 +210,8 @@ public class TornadoEvent : MonoBehaviour
 
         if (playerMotor != null)
             playerMotor.SetTornadoSlowdown(1f);
+
+        AppliedSlowdown = 1f;
 
         StopTornadoAudio();
 

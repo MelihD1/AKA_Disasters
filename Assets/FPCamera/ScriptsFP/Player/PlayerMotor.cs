@@ -13,6 +13,9 @@ public class PlayerMotor : MonoBehaviour
     [SerializeField] private Transform cameraOffset;
     private float tornadoSpeedMultiplier = 1f;
 
+    /// <summary>The tornado slowdown currently applied to the player.</summary>
+    public float TornadoSpeedMultiplier => tornadoSpeedMultiplier;
+
     public void SetTornadoSlowdown(float multiplier)
     {
         tornadoSpeedMultiplier = Mathf.Clamp(multiplier, 0.05f, 1f);
